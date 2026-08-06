@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { ApiError, Model } from "../../shared/types";
-import { buildFacets, filterModels, type CatalogFilters, type SortOrder } from "../api/catalog";
+import {
+  buildFacets,
+  filterModels,
+  type CatalogFilters,
+  type LoadPass,
+  type SortOrder,
+} from "../api/catalog";
 import { FilterMenu } from "../components/FilterMenu";
 import { ModelCard } from "../components/ModelCard";
 import { describeAge } from "../state/catalogCache";
@@ -19,6 +25,7 @@ export function Catalog({
   revalidating,
   error,
   fetchedAt,
+  passes,
   filters,
   onFiltersChange,
   onClearFilters,
@@ -29,6 +36,7 @@ export function Catalog({
   revalidating: boolean;
   error: ApiError | null;
   fetchedAt: number | null;
+  passes: LoadPass[];
   filters: CatalogFilters;
   onFiltersChange: (patch: Partial<CatalogFilters>) => void;
   onClearFilters: () => void;
@@ -41,6 +49,10 @@ export function Catalog({
     () => models.filter((model) => model.pricing.entries.length > 0).length,
     [models],
   );
+
+  const cloudflareCount = useMemo(() => models.filter((m) => m.cloudflareHosted).length, [models]);
+  const thirdPartyCount = models.length - cloudflareCount;
+  const failedPasses = passes.filter((p) => p.error).length;
 
   const hasFilters =
     filters.search !== "" ||
@@ -157,6 +169,54 @@ export function Catalog({
           </label>
         </div>
       </div>
+
+      {/*
+        Which query returned what, including failures. Without this a pass that
+        errors looks identical to a provider that genuinely has no models —
+        which is exactly how the missing third-party models stayed invisible.
+      */}
+      {passes.length > 0 && (
+        <details className="coverage" open={thirdPartyCount === 0}>
+          <summary>
+            Catalog coverage: <strong>{cloudflareCount}</strong> Cloudflare-hosted ·{" "}
+            <strong>{thirdPartyCount}</strong> third-party
+            {failedPasses > 0 && <span className="coverage-warn"> · {failedPasses} query failed</span>}
+          </summary>
+          <table className="coverage-table">
+            <thead>
+              <tr>
+                <th>Query</th>
+                <th>Models</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {passes.map((pass) => (
+                <tr key={pass.label} className={pass.error ? "is-error" : ""}>
+                  <td className="mono">{pass.label}</td>
+                  <td className="mono">{pass.items}</td>
+                  <td>{pass.error ?? "ok"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {thirdPartyCount === 0 && (
+            <p className="muted small">
+              No third-party models were returned. These are billed through AI Gateway, so listing
+              them may require an API token with <strong>AI Gateway</strong> permission in addition
+              to Workers AI, and possibly a Gateway ID on the setup screen. Compare against{" "}
+              <a
+                href="https://developers.cloudflare.com/ai/models/?providers=third-party"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Cloudflare's third-party list ↗
+              </a>
+              .
+            </p>
+          )}
+        </details>
+      )}
 
       {error && models.length > 0 && (
         <div className="notice" role="status">

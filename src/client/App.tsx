@@ -88,7 +88,7 @@ function AccountMenu({ creds, onDisconnect }: { creds: Credentials; onDisconnect
 export default function App() {
   const [creds, setCreds] = useState<Credentials | null>(loadCredentials);
   const route = useHashRoute();
-  const { models, loading, revalidating, error, fetchedAt, reload } = useCatalog(creds);
+  const { models, loading, revalidating, error, fetchedAt, passes, reload } = useCatalog(creds);
   // Held here rather than inside Catalog, so opening a model and coming back
   // does not throw away the filters the user set.
   const { filters, update: updateFilters, reset: resetFilters } = useFilters();
@@ -156,6 +156,7 @@ export default function App() {
             revalidating={revalidating}
             error={error}
             fetchedAt={fetchedAt}
+            passes={passes}
             filters={filters}
             onFiltersChange={updateFilters}
             onClearFilters={resetFilters}

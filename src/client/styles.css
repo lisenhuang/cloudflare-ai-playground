@@ -1055,6 +1055,59 @@ select.field-input {
   gap: 9px;
 }
 
+.coverage {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.coverage summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.coverage summary strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-warn {
+  color: var(--danger);
+  font-weight: 550;
+}
+
+.coverage-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 4px;
+  font-size: 12.5px;
+  display: block;
+  overflow-x: auto;
+}
+
+.coverage-table th,
+.coverage-table td {
+  text-align: left;
+  padding: 5px 12px 5px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.coverage-table th {
+  color: var(--text-faint);
+  font-weight: 550;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+.coverage-table tr.is-error td {
+  color: var(--danger);
+}
+
 .result-actions {
   display: inline-flex;
   align-items: center;
