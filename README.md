@@ -19,6 +19,7 @@ Built on Cloudflare Workers + Hono + React. Bring your own key.
   classification scores — decided from the actual response rather than the task label.
 - **Reports real cost per run** from the `usage` payload and `cf-aig-*` response headers, plus a
   session total. Estimates are never substituted for what Cloudflare actually charged.
+- **Shows the current AI Gateway credit balance** in the header and refreshes it automatically.
 - **Follows your system theme** automatically, with an optional manual override.
 - **Works on phone and desktop**: two panes side by side on wide screens, tabbed panes on narrow.
 
@@ -34,7 +35,7 @@ Open the app and supply:
 | Field | Where to find it |
 | --- | --- |
 | **Account ID** | The 32-char hex string in your dashboard URL, after `dash.cloudflare.com/` |
-| **API token** | [Create one](https://dash.cloudflare.com/profile/api-tokens) with **Workers AI → Edit** |
+| **API token** | [Create one](https://dash.cloudflare.com/profile/api-tokens) with **Workers AI → Edit**; add **AI Gateway → Read** to show the balance |
 | **Gateway ID** *(optional)* | An [AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway) name |
 
 Deploy with `npm run deploy`.
@@ -55,7 +56,7 @@ it to `api.cloudflare.com` **without storing, caching, or logging it**. There ar
 That design has a real consequence worth stating plainly: **anyone who can run JavaScript on this
 origin can read the token.** So:
 
-- Scope the token to **Workers AI → Edit** and nothing else, on a single account.
+- Scope the token to **Workers AI → Edit** and, if you want the balance, **AI Gateway → Read**, on a single account.
 - Give it an expiry.
 - If you deploy this publicly, understand that every visitor pays for their own inference — but also
   that an XSS bug on the page would expose their token. Do not add third-party scripts to it.

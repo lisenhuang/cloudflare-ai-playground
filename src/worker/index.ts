@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { aiUrl, errorResponse, getCredentials, proxyToCloudflare, ProxyError } from "./cf-proxy";
+import { accountUrl, aiUrl, errorResponse, getCredentials, proxyToCloudflare, ProxyError } from "./cf-proxy";
 import { fetchDocsCatalog } from "./docs-catalog";
 
 interface Env {
@@ -57,6 +57,20 @@ app.get("/api/catalog/models", async (c) => {
       if (value !== undefined && value !== "") query.set(key, value);
     }
     return await proxyToCloudflare(creds, aiUrl(creds, "catalog/models", query), { method: "GET" });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+
+/** GET /api/billing/credit-balance — the visitor's AI Gateway credit balance. */
+app.get("/api/billing/credit-balance", async (c) => {
+  try {
+    const creds = getCredentials(c);
+    return await proxyToCloudflare(
+      creds,
+      accountUrl(creds, "ai-gateway/billing/credit-balance"),
+      { method: "GET" },
+    );
   } catch (err) {
     return errorResponse(err);
   }

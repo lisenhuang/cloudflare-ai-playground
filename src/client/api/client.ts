@@ -106,6 +106,48 @@ export async function fetchBillingCatalog(creds: Credentials, query: CatalogQuer
   return response.json();
 }
 
+export interface CreditBalance {
+  balance: number;
+  hasDefaultPaymentMethod: boolean;
+}
+
+/** Reads the current AI Gateway credit balance for the connected account. */
+export async function fetchCreditBalance(creds: Credentials): Promise<CreditBalance> {
+  try {
+    const response = await apiFetch(creds, "/api/billing/credit-balance");
+    const body = (await response.json()) as {
+      result?: { balance?: unknown; has_default_payment_method?: unknown };
+    };
+    const result = body.result;
+    const rawBalance = result?.balance;
+    const balance =
+      typeof rawBalance === "number"
+        ? rawBalance
+        : typeof rawBalance === "string" && rawBalance.trim() !== ""
+          ? Number(rawBalance)
+          : Number.NaN;
+    if (!Number.isFinite(balance)) {
+      throw new RequestFailed({
+        status: 502,
+        message: "Cloudflare returned no usable AI Gateway credit balance.",
+        hint: "Check that the API token has AI Gateway → Read permission.",
+      });
+    }
+    return {
+      balance,
+      hasDefaultPaymentMethod: result?.has_default_payment_method === true,
+    };
+  } catch (err) {
+    if (err instanceof RequestFailed && (err.error.status === 401 || err.error.status === 403)) {
+      throw new RequestFailed({
+        ...err.error,
+        hint: "This token needs AI Gateway → Read permission to show the credit balance.",
+      });
+    }
+    throw err;
+  }
+}
+
 export async function fetchModelSchema(creds: Credentials, model: string): Promise<ModelSchema> {
   const response = await apiFetch(creds, `/api/schema?model=${encodeURIComponent(model)}`);
   const body = (await response.json()) as { result?: ModelSchema } & Partial<ModelSchema>;

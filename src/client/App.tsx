@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CF_MODEL_CATALOG_URL, type Credentials, type Model } from "../shared/types";
+import { fetchCreditBalance, RequestFailed } from "./api/client";
 import { Catalog } from "./pages/Catalog";
 import { ModelRunner } from "./pages/ModelRunner";
 import { Setup } from "./pages/Setup";
@@ -85,6 +86,73 @@ function AccountMenu({ creds, onDisconnect }: { creds: Credentials; onDisconnect
   );
 }
 
+function formatCreditBalance(balance: number): string {
+  const fractionDigits = Math.abs(balance) < 1 ? 4 : 2;
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(balance);
+}
+
+function CreditBalance({ creds }: { creds: Credentials }) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    fetchCreditBalance(creds)
+      .then(({ balance: nextBalance }) => {
+        if (cancelled) return;
+        setBalance(nextBalance);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof RequestFailed) {
+          setError(err.error.message + (err.error.hint ? " " + err.error.hint : ""));
+        } else {
+          setError(err instanceof Error ? err.message : "Could not read the AI Gateway balance.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    const interval = window.setInterval(() => setRefreshNonce((current) => current + 1), 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [creds, refreshNonce]);
+
+  const label =
+    balance === null
+      ? loading
+        ? "Credits …"
+        : "Credits unavailable"
+      : "Credits " + formatCreditBalance(balance);
+
+  return (
+    <button
+      type="button"
+      className={"credit-balance" + (error ? " is-error" : "")}
+      onClick={() => setRefreshNonce((current) => current + 1)}
+      title={error ?? "Refresh AI Gateway credit balance"}
+      aria-label={error ? "AI Gateway credit balance unavailable: " + error : label}
+    >
+      {label}
+      {balance !== null && loading && <span aria-hidden="true"> ·</span>}
+      {balance !== null && loading && <span className="credit-refresh-dot" aria-hidden="true">…</span>}
+    </button>
+  );
+}
+
 export default function App() {
   const [creds, setCreds] = useState<Credentials | null>(loadCredentials);
   const route = useHashRoute();
@@ -130,6 +198,7 @@ export default function App() {
             <span className="doc-link-full">Model catalog</span>
             <span className="doc-link-short">Docs</span> <span aria-hidden="true">↗</span>
           </a>
+          {creds && !needsSetup && <CreditBalance creds={creds} />}
           <span className="app-version mono" title={`CF Models version ${__APP_VERSION__}`}>
             v{__APP_VERSION__}
           </span>

@@ -89,7 +89,8 @@ export function Setup({
               API token <span className="required-dot">*</span>
             </label>
             <p className="field-help">
-              Create one with the <strong>Workers AI → Edit</strong> permission and nothing else. Add{" "}
+              Create one with the <strong>Workers AI → Edit</strong> permission. Add{" "}
+              <strong>AI Gateway → Read</strong> to show your credit balance, and{" "}
               <strong>AI Gateway → Run</strong> only if you use a gateway.{" "}
               <a href={TOKEN_URL} target="_blank" rel="noreferrer">
                 Create a token ↗

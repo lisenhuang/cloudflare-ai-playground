@@ -70,6 +70,13 @@ export function aiUrl(creds: Credentials, path: string, query?: URLSearchParams)
   return `${CF_API_BASE}/accounts/${creds.accountId}/ai/${clean}${qs}`;
 }
 
+/** Builds `.../accounts/{id}/{path}` for account-scoped APIs outside `/ai`. */
+export function accountUrl(creds: Credentials, path: string, query?: URLSearchParams): string {
+  const clean = path.replace(/^\/+/, "");
+  const qs = query && [...query.keys()].length ? `?${query.toString()}` : "";
+  return `${CF_API_BASE}/accounts/${creds.accountId}/${clean}${qs}`;
+}
+
 /**
  * Calls the Cloudflare AI API and returns the upstream response verbatim.
  *
