@@ -175,6 +175,78 @@ export function Catalog({
         errors looks identical to a provider that genuinely has no models —
         which is exactly how the missing third-party models stayed invisible.
       */}
+      {/*
+        Surfaced prominently rather than buried: an empty third-party list looks
+        like a broken app, when it is actually an account billing state.
+      */}
+      {!loading && models.length > 0 && thirdPartyCount === 0 && (
+        <div className="billing-notice" role="status">
+          <strong>Only Cloudflare-hosted models are available on this account.</strong>
+          <p>
+            Third-party models — Anthropic, Google, OpenAI, ElevenLabs, Black Forest Labs — are gated
+            behind <strong>Unified Billing</strong>. Until your AI Gateway has credits (or a provider
+            key via BYOK), Cloudflare does not list them, and running one returns{" "}
+            <code>402 Insufficient balance</code>. This is an account state, not a token permission.
+          </p>
+          <details className="billing-steps">
+            <summary>How to add credits</summary>
+            <ol>
+              <li>
+                Open{" "}
+                <a
+                  href="https://dash.cloudflare.com/?to=/:account/ai/ai-gateway"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  AI Gateway ↗
+                </a>{" "}
+                in the Cloudflare dashboard.
+              </li>
+              <li>
+                In the <strong>Credits Available</strong> card at the top right, select{" "}
+                <strong>Manage</strong>.
+              </li>
+              <li>Add a payment method if you have not already.</li>
+              <li>
+                Choose <strong>Top-up credits</strong>, enter an amount, and confirm.
+              </li>
+              <li>
+                Come back and hit <strong>Refresh</strong> — third-party models should appear.
+              </li>
+            </ol>
+            <p className="muted">
+              Cloudflare adds a <strong>5% fee</strong> on credits bought this way ($100 of credit
+              costs $105), and passes provider inference rates through without markup. Optional:{" "}
+              <strong>Manage → Setup auto top-up</strong> refills automatically below a threshold.
+            </p>
+            <p className="muted">
+              <strong>Or skip credits entirely with BYOK.</strong> Store your own Anthropic / OpenAI
+              / Google key on the gateway under the <code>default</code> alias, and it is used ahead
+              of Unified Billing — you pay that provider directly instead of Cloudflare.
+            </p>
+          </details>
+
+          <p className="billing-actions">
+            <a
+              className="secondary-button small"
+              href="https://dash.cloudflare.com/?to=/:account/ai/ai-gateway"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open AI Gateway ↗
+            </a>
+            <a
+              className="link-button"
+              href="https://developers.cloudflare.com/ai-gateway/features/unified-billing/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Unified Billing docs ↗
+            </a>
+          </p>
+        </div>
+      )}
+
       {passes.length > 0 && (
         <details className="coverage" open={thirdPartyCount === 0}>
           <summary>
@@ -202,15 +274,26 @@ export function Catalog({
           </table>
           {thirdPartyCount === 0 && (
             <p className="muted small">
-              No third-party models were returned. These are billed through AI Gateway, so listing
-              them may require an API token with <strong>AI Gateway</strong> permission in addition
-              to Workers AI, and possibly a Gateway ID on the setup screen. Compare against{" "}
+              Cloudflare's catalog API is returning only Workers AI models for this account.
+              Third-party models (Anthropic, Google, OpenAI, ElevenLabs and the rest) are gated
+              behind <strong>Unified Billing</strong>: until the AI Gateway has credits — or a
+              provider key via BYOK — they are not listed, and running one returns{" "}
+              <code>402 Insufficient balance</code>. This is an account state, not a token
+              permission. Add credits under{" "}
+              <a
+                href="https://dash.cloudflare.com/?to=/:account/ai/ai-gateway"
+                target="_blank"
+                rel="noreferrer"
+              >
+                AI Gateway ↗
+              </a>
+              , then hit Refresh. Full list:{" "}
               <a
                 href="https://developers.cloudflare.com/ai/models/?providers=third-party"
                 target="_blank"
                 rel="noreferrer"
               >
-                Cloudflare's third-party list ↗
+                third-party models ↗
               </a>
               .
             </p>

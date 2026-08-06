@@ -48,6 +48,10 @@ async function toApiError(response: Response): Promise<ApiError> {
     hint ??= "The token is valid but lacks permission. It needs Workers AI → Edit on this account.";
   } else if (response.status === 429) {
     hint ??= "Rate limited by Cloudflare. Wait a moment and retry.";
+  } else if (response.status === 402 || /insufficient balance|add money/i.test(message)) {
+    // Third-party models are gated behind Unified Billing, not permissions.
+    hint =
+      "Third-party models are billed through AI Gateway Unified Billing. Add credits to your gateway, or configure BYOK with your own provider key. Cloudflare-hosted (@cf/…) models are unaffected.";
   }
 
   return { status: response.status, message, code, hint };

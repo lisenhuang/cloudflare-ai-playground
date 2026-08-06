@@ -1055,6 +1055,65 @@ select.field-input {
   gap: 9px;
 }
 
+.billing-notice {
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.billing-notice > strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.billing-notice p {
+  margin-bottom: 10px;
+}
+
+.billing-notice code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.billing-steps {
+  margin: 10px 0;
+}
+
+.billing-steps summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+
+.billing-steps ol {
+  margin: 10px 0;
+  padding-left: 22px;
+}
+
+.billing-steps li {
+  margin-bottom: 5px;
+}
+
+.billing-steps p {
+  font-size: 12.5px;
+}
+
+.billing-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 0 !important;
+}
+
 .coverage {
   border: 1px solid var(--border);
   border-radius: var(--radius);
