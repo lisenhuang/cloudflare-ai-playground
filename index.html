@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Browse, inspect and run every AI model in the Cloudflare catalog with your own API token."
+    />
+    <title>CF Models — Cloudflare AI Playground</title>
+    <script>
+      // Applied before first paint so a stored theme preference never flashes.
+      (function () {
+        try {
+          var t = localStorage.getItem("cf-models.theme");
+          if (t === "light" || t === "dark") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {
+          /* localStorage unavailable — fall back to the system theme */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/client/main.tsx"></script>
+  </body>
+</html>

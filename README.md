@@ -1,0 +1,119 @@
+# CF Models
+
+A playground for **every** model in the Cloudflare AI catalog — Workers AI and third-party alike —
+with live pricing and an input form generated from each model's own JSON Schema.
+
+Built on Cloudflare Workers + Hono + React. Bring your own key.
+
+## What it does
+
+- **Browses the whole catalog** from `GET /ai/models/search`, with search, task-type and author
+  facets, and Cloudflare-vs-third-party filtering.
+- **Prices every model from the API.** No price is hardcoded anywhere in this repo — see
+  [Pricing](#pricing) below.
+- **Generates a form per model** from `GET /ai/models/schema`, so a model added to Cloudflare
+  tomorrow is usable today with no code change. Anything the widget mapping can't express falls back
+  to a JSON editor, so no model is ever un-runnable.
+- **Renders output by task type** — streamed text, images, audio, video, transcripts, embeddings,
+  classification scores — decided from the actual response rather than the task label.
+- **Reports real cost per run** from the `usage` payload and `cf-aig-*` response headers, plus a
+  session total. Estimates are never substituted for what Cloudflare actually charged.
+- **Follows your system theme** automatically, with an optional manual override.
+- **Works on phone and desktop**: two panes side by side on wide screens, tabbed panes on narrow.
+
+## Getting started
+
+```bash
+npm install
+npm run dev          # http://localhost:5173
+```
+
+Open the app and supply:
+
+| Field | Where to find it |
+| --- | --- |
+| **Account ID** | The 32-char hex string in your dashboard URL, after `dash.cloudflare.com/` |
+| **API token** | [Create one](https://dash.cloudflare.com/profile/api-tokens) with **Workers AI → Edit** |
+| **Gateway ID** *(optional)* | An [AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway) name |
+
+Deploy with `npm run deploy`.
+
+### About the optional Gateway ID
+
+Cloudflare's unified `/ai/run` endpoint requires a `cf-aig-gateway-id` header for Workers AI models
+(it is optional for third-party ones). With a gateway configured, every model goes through one code
+path and you get per-request cost reporting. Without one, the app automatically falls back to the
+path-based `/ai/run/{model}` route for `@cf/...` models, which needs no gateway. Either way it works.
+
+## Security: this is a bring-your-own-key app
+
+Your token is kept in `localStorage` and sent only to this app's own `/api/*` proxy, which forwards
+it to `api.cloudflare.com` **without storing, caching, or logging it**. There are no secrets in
+`wrangler.jsonc` and no server-side account.
+
+That design has a real consequence worth stating plainly: **anyone who can run JavaScript on this
+origin can read the token.** So:
+
+- Scope the token to **Workers AI → Edit** and nothing else, on a single account.
+- Give it an expiry.
+- If you deploy this publicly, understand that every visitor pays for their own inference — but also
+  that an XSS bug on the page would expose their token. Do not add third-party scripts to it.
+
+Use the **Disconnect** button in the header to wipe the stored credentials.
+
+## Pricing
+
+Cloudflare's published pricing page documents only a subset of the catalog, so a table checked into
+this repo would be both stale and incomplete. Pricing is instead resolved at runtime, in order
+([`src/client/pricing/resolve.ts`](src/client/pricing/resolve.ts)):
+
+1. **`GET /ai/models/search?format=openrouter`** — the marketplace format, which normalizes token
+   pricing across Cloudflare-hosted and third-party models.
+2. **The default catalog response's own metadata** — where non-token units (per image, per step, per
+   audio minute) and neuron rates live.
+3. **Nothing.** A model with no published price displays "Price not published" — never a guess, never
+   `$0`.
+
+Token prices are normalized to USD per million tokens so the catalog can be sorted and compared;
+image, audio and video models keep their native unit, because a per-token conversion would be
+meaningless for them.
+
+## Pinning the API shapes
+
+Parts of the catalog response are not fully specified in Cloudflare's public docs. The probe script
+dumps the real payloads so the field mapping can be checked against reality:
+
+```bash
+CF_ACCOUNT_ID=xxx CF_API_TOKEN=yyy npm run probe
+```
+
+It writes raw responses to `.probe/` (gitignored) and prints where pricing, task type and capability
+data actually live — plus whether the unified `/ai/run` endpoint accepts a Workers AI model without a
+gateway ID on your account.
+
+## Layout
+
+```
+src/
+  worker/
+    index.ts          Hono routes: /api/models, /api/schema, /api/run, /api/cf/* passthrough
+    cf-proxy.ts       Credential extraction, streaming upstream fetch, error normalization
+  shared/types.ts     Types shared across the client/worker boundary
+  client/
+    api/              Fetch layer, response normalization, catalog load + filter + sort
+    pricing/          API-sourced price resolution and unit formatting
+    form/             JSON Schema → widget mapping, and the generated form
+    output/           Task-type-aware output renderers
+    pages/            Setup, Catalog, ModelRunner
+    state/            Credentials, theme, catalog hook, hash router
+scripts/probe.mjs     API shape probe
+```
+
+## Notes and limits
+
+- Text rendering handles fenced code blocks and preserves line breaks; it is not a full Markdown
+  renderer, so nothing gets silently swallowed.
+- Long-running models (video, music) are submitted as queued jobs and polled every 3s for up to 10
+  minutes. A pending job is stored in `localStorage`, so a page refresh resumes polling.
+- The whole catalog is loaded once and filtered in memory. That is what makes sorting by price
+  correct — the API cannot rank on a field it does not sort by.
