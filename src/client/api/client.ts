@@ -138,13 +138,13 @@ export async function fetchCreditBalance(creds: Credentials): Promise<CreditBala
     };
     const result = body.result;
     const rawBalance = result?.balance;
-    const balance =
+    const balanceCents =
       typeof rawBalance === "number"
         ? rawBalance
         : typeof rawBalance === "string" && rawBalance.trim() !== ""
           ? Number(rawBalance)
           : Number.NaN;
-    if (!Number.isFinite(balance)) {
+    if (!Number.isFinite(balanceCents)) {
       throw new RequestFailed({
         status: 502,
         message: "Cloudflare returned no usable AI Gateway credit balance.",
@@ -152,7 +152,9 @@ export async function fetchCreditBalance(creds: Credentials): Promise<CreditBala
       });
     }
     return {
-      balance,
+      // Cloudflare's billing API expresses credits in cents. The top-up API
+      // documents the same unit; convert once before formatting as USD.
+      balance: balanceCents / 100,
       hasDefaultPaymentMethod: result?.has_default_payment_method === true,
     };
   } catch (err) {

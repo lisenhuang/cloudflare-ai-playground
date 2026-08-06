@@ -108,6 +108,7 @@ The header balance is read from:
 GET /accounts/{account_id}/ai-gateway/billing/credit-balance
 ```
 
+Cloudflare returns the credit balance in cents; the app converts it to USD before displaying it.
 It refreshes when clicked and automatically every 60 seconds. Missing AI Gateway Read permission
 is shown as **Credits unavailable** with a short hint.
 
