@@ -1,10 +1,10 @@
 /**
  * Third-party models as a live secondary catalog source.
  *
- * Cloudflare's `/ai/models/search` API only ever returns Workers AI models —
- * verified against a live account, no parameter surfaces the third-party ones.
- * They are nonetheless runnable through `/ai/run`, so the only thing missing is
- * a list.
+ * Cloudflare's public `/ai/models/search` API only ever returns Workers AI models.
+ * The authenticated account catalog supplies pricing for the third-party models
+ * available to an account, while the official model docs fill out the broader
+ * public list of models runnable through `/ai/run`.
  *
  * Cloudflare publishes that list on its own docs site, where each model is a
  * cell carrying structured data attributes. This fetches and parses that page

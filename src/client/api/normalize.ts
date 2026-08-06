@@ -1,4 +1,4 @@
-import type { Model } from "../../shared/types";
+import type { Model, PriceEntry } from "../../shared/types";
 import { PriceIndex, priceFromOpenRouter, resolvePrice } from "../pricing/resolve";
 
 /**
@@ -149,7 +149,11 @@ function extractContextWindow(item: Dict): number | undefined {
   return undefined;
 }
 
-export function normalizeModel(raw: unknown, index?: PriceIndex): Model | null {
+export function normalizeModel(
+  raw: unknown,
+  marketplaceIndex?: PriceIndex,
+  accountIndex?: PriceIndex,
+): Model | null {
   const item = asDict(raw);
   if (!item) return null;
   const id = extractId(item);
@@ -168,7 +172,7 @@ export function normalizeModel(raw: unknown, index?: PriceIndex): Model | null {
     contextWindow: extractContextWindow(item),
     thirdParty: !cloudflareHosted || tags.includes("Third-party") || tags.includes("Partner"),
     cloudflareHosted,
-    pricing: resolvePrice(id, item, index),
+    pricing: resolvePrice(id, item, marketplaceIndex, accountIndex),
     raw,
   };
 }
@@ -196,15 +200,21 @@ export function extractPageInfo(payload: unknown): { page?: number; perPage?: nu
   };
 }
 
-/** Builds the price index from already-collected OpenRouter-format items. */
-export function buildPriceIndexFromItems(items: unknown[]): PriceIndex {
+/** Builds a price index from already-collected catalog items. */
+export function buildPriceIndexFromItems(
+  items: unknown[],
+  extractPricing: (item: unknown) => PriceEntry[] = (item) => {
+    const record = asDict(item);
+    return priceFromOpenRouter(record?.pricing);
+  },
+): PriceIndex {
   const index = new PriceIndex();
   for (const raw of items) {
     const item = asDict(raw);
     if (!item) continue;
     const id = extractId(item);
     if (!id) continue;
-    index.add(id, priceFromOpenRouter(item.pricing));
+    index.add(id, extractPricing(item));
   }
   return index;
 }

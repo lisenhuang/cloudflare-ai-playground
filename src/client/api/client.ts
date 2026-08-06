@@ -97,6 +97,15 @@ export async function fetchCatalog(creds: Credentials, query: CatalogQuery): Pro
   return response.json();
 }
 
+/**
+ * Cloudflare's account catalog is richer than `/ai/models/search`: it includes
+ * the authenticated Unified Billing catalog and per-model pricing.
+ */
+export async function fetchBillingCatalog(creds: Credentials, query: CatalogQuery): Promise<unknown> {
+  const response = await apiFetch(creds, `/api/catalog/models?${toQueryString(query)}`);
+  return response.json();
+}
+
 export async function fetchModelSchema(creds: Credentials, model: string): Promise<ModelSchema> {
   const response = await apiFetch(creds, `/api/schema?model=${encodeURIComponent(model)}`);
   const body = (await response.json()) as { result?: ModelSchema } & Partial<ModelSchema>;

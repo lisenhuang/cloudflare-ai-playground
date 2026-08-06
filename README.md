@@ -68,11 +68,12 @@ Cloudflare's published pricing page documents only a subset of the catalog, so a
 this repo would be both stale and incomplete. Pricing is instead resolved at runtime, in order
 ([`src/client/pricing/resolve.ts`](src/client/pricing/resolve.ts)):
 
-1. **`GET /ai/models/search?format=openrouter`** — the marketplace format, which normalizes token
+1. **`GET /ai/catalog/models`** — the authenticated account catalog, including Unified Billing prices.
+2. **`GET /ai/models/search?format=openrouter`** — the marketplace format, which normalizes token
    pricing across Cloudflare-hosted and third-party models.
-2. **The default catalog response's own metadata** — where non-token units (per image, per step, per
+3. **The default catalog response's own metadata** — where non-token units (per image, per step, per
    audio minute) and neuron rates live.
-3. **Nothing.** A model with no published price displays "Price not published" — never a guess, never
+4. **Nothing.** A model with no published price displays "Price not published" — never a guess, never
    `$0`.
 
 Token prices are normalized to USD per million tokens so the catalog can be sorted and compared;
@@ -81,16 +82,15 @@ meaningless for them.
 
 ## Third-party models
 
-Cloudflare's catalog API (`/ai/models/search`) returns **only Workers AI models** — verified against
-a live account, with credits loaded. `search=claude`, `author=anthropic` and `task=Text-to-Video` all
-return zero, and its `total_count: 286` does not match the 61 it actually hands over. Credits do not
-change this: they gate *running* a third-party model, not listing it.
+Cloudflare's public model-search API (`/ai/models/search`) returns **only Workers AI models**. The
+authenticated account catalog (`/ai/catalog/models`) is a separate, paginated source that includes
+the third-party models available to the account and their per-model Unified Billing prices.
 
-Since the models are runnable but unlisted, the app takes the list from Cloudflare's own **published
-catalog** instead. The Worker fetches `developers.cloudflare.com/ai/models` server-side (the browser
-cannot, for CORS reasons), parses the structured `data-*` attributes on each model cell, and merges
-the result with the API catalog — API records win where both exist, since they carry pricing. That
-brings the grid to ~218 models, ~139 of them third-party.
+The app combines the account catalog with Cloudflare's own **published catalog**. The Worker fetches
+`developers.cloudflare.com/ai/models` server-side (the browser cannot, for CORS reasons), parses the
+structured `data-*` attributes on each model cell, and merges the result with live API data. Account
+catalog records are preferred for third-party pricing; the published docs remain the broader list
+source for models not present in the account catalog.
 
 This is a live fetch on every cache miss, not a list checked into the repo. It is also **HTML
 parsing**, so it is the most fragile part of this codebase: if Cloudflare changes that page's markup

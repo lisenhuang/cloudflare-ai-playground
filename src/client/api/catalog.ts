@@ -1,5 +1,5 @@
 import type { Credentials, Model } from "../../shared/types";
-import { fetchCatalog, type CatalogQuery } from "./client";
+import { fetchBillingCatalog, fetchCatalog, type CatalogQuery } from "./client";
 import {
   buildPriceIndexFromItems,
   extractId,
@@ -7,6 +7,7 @@ import {
   extractPageInfo,
   normalizeModel,
 } from "./normalize";
+import { priceFromCatalogItem } from "../pricing/resolve";
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 50; // Backstop against a server that never reports completion.
@@ -19,11 +20,17 @@ const MAX_PAGES = 50; // Backstop against a server that never reports completion
  * is normal and does not mean the end of the list. Stopping on that assumption
  * silently truncated the catalog to a single page.
  */
-async function fetchAllPages(creds: Credentials, base: CatalogQuery): Promise<unknown[]> {
+type CatalogPageFetcher = (creds: Credentials, query: CatalogQuery) => Promise<unknown>;
+
+async function fetchAllPages(
+  creds: Credentials,
+  base: CatalogQuery,
+  fetchPage: CatalogPageFetcher = fetchCatalog,
+): Promise<unknown[]> {
   const collected: unknown[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const payload = await fetchCatalog(creds, { ...base, page, perPage: PAGE_SIZE });
+    const payload = await fetchPage(creds, { ...base, page, perPage: PAGE_SIZE });
     const items = extractItems(payload);
     if (!items.length) break;
 
@@ -59,9 +66,10 @@ async function runPass(
   label: string,
   base: CatalogQuery,
   passes: LoadPass[],
+  fetchPage: CatalogPageFetcher = fetchCatalog,
 ): Promise<unknown[]> {
   try {
-    const items = await fetchAllPages(creds, base);
+    const items = await fetchAllPages(creds, base, fetchPage);
     passes.push({ label, items: items.length });
     return items;
   } catch (err) {
@@ -81,13 +89,13 @@ async function runPass(
 const SOURCE_IDS = [1, 2, 3, 4, 5];
 
 /**
- * Models Cloudflare publishes but does not return from the catalog API.
+ * Models Cloudflare publishes but does not return from the public model-search API.
  *
- * Every third-party model falls in this gap: runnable through /ai/run, absent
- * from /ai/models/search under any parameter. The Worker fetches Cloudflare's
- * published catalog for us, so this stays a live lookup rather than a list
- * checked into the repo. A failure here is never fatal — it just means the grid
- * shows Workers AI models only, as it did before.
+ * Some third-party models fall in this gap: runnable through /ai/run, absent
+ * from /ai/models/search and the authenticated account catalog. The Worker
+ * fetches Cloudflare's published catalog for us, so this stays a live lookup
+ * rather than a list checked into the repo. A failure here is never fatal — it
+ * just means the grid shows the account catalog's models only.
  */
 async function fetchPublishedCatalog(passes: LoadPass[]): Promise<unknown[]> {
   try {
@@ -106,10 +114,10 @@ async function fetchPublishedCatalog(passes: LoadPass[]): Promise<unknown[]> {
 /**
  * Loads the entire catalog once, then filters and sorts in memory.
  *
- * Two passes are unioned so that no model is missed: the default format carries
- * the richer metadata (task object, description, capabilities), while the
- * marketplace format is the one that carries pricing — and the two do not
- * always cover exactly the same set. Union, then prefer the richer record.
+ * The account catalog pass is the primary pricing source for Unified Billing
+ * models. The public default and marketplace passes still fill Workers AI
+ * metadata and legacy pricing, while the published docs pass covers models the
+ * account catalog does not return. Union, then prefer the richer API record.
  *
  * Holding the whole catalog also makes search, faceting and sorting by price
  * instant and correct; server-side pagination cannot rank on a field it does
@@ -118,27 +126,35 @@ async function fetchPublishedCatalog(passes: LoadPass[]): Promise<unknown[]> {
 export async function loadAllModels(creds: Credentials): Promise<CatalogLoad> {
   const passes: LoadPass[] = [];
 
-  const [defaultItems, marketplaceItems, publishedItems, ...sourceResults] = await Promise.all([
+  const [defaultItems, marketplaceItems, billingItems, publishedItems, ...sourceResults] = await Promise.all([
     runPass(creds, "default", {}, passes),
     runPass(creds, "marketplace", { format: "openrouter" }, passes),
+    runPass(creds, "account catalog", {}, passes, fetchBillingCatalog),
     fetchPublishedCatalog(passes),
     ...SOURCE_IDS.map((source) => runPass(creds, `source=${source}`, { source }, passes)),
   ]);
 
   const priceIndex = buildPriceIndexFromItems(marketplaceItems);
+  const accountPriceIndex = buildPriceIndexFromItems(billingItems, priceFromCatalogItem);
 
-  // Published-catalog entries first, then the API's own records overwrite them:
-  // the API is authoritative and carries pricing, while the published catalog
-  // exists only to cover the models the API refuses to list at all.
+  // Published-catalog entries first, then account/search API records overwrite
+  // them. The account catalog is the authoritative source for third-party
+  // pricing; the published catalog exists only to cover models it omits.
   const byId = new Map<string, unknown>();
-  for (const item of [...publishedItems, ...marketplaceItems, ...sourceResults.flat(), ...defaultItems]) {
+  for (const item of [
+    ...publishedItems,
+    ...billingItems,
+    ...marketplaceItems,
+    ...sourceResults.flat(),
+    ...defaultItems,
+  ]) {
     const id = extractId(item);
     if (id) byId.set(id, item);
   }
 
   const models: Model[] = [];
   for (const item of byId.values()) {
-    const model = normalizeModel(item, priceIndex);
+    const model = normalizeModel(item, priceIndex, accountPriceIndex);
     if (model) models.push(model);
   }
   return { models, passes };

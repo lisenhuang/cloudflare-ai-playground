@@ -197,7 +197,7 @@ export function Catalog({
         <div className="billing-notice" role="status">
           <strong>Third-party models could not be listed.</strong>
           <p>
-            Cloudflare's catalog API only ever returns Workers AI models, so this app reads the
+            Cloudflare's public model-search API only ever returns Workers AI models, so this app reads the
             published catalog for the rest — and that lookup came back empty (see Catalog coverage
             below). They still run through the same endpoint, so you can open one by ID. Running one
             needs credits in your AI Gateway, or a provider key via BYOK; without them it returns{" "}
@@ -290,10 +290,11 @@ export function Catalog({
           </table>
           {thirdPartyCount === 0 && (
             <p className="muted small">
-              Cloudflare's catalog API is returning only Workers AI models for this account.
-              Third-party models (Anthropic, Google, OpenAI, ElevenLabs and the rest) are gated
-              behind <strong>Unified Billing</strong>: until the AI Gateway has credits — or a
-              provider key via BYOK — they are not listed, and running one returns{" "}
+              The public model-search API returns only Workers AI models for this account. Some
+              third-party models are available through the authenticated account catalog; the rest
+              are listed from Cloudflare's published catalog. Running a model that is not covered by
+              Unified Billing still requires AI Gateway credits or a provider key via BYOK, otherwise
+              it returns{" "}
               <code>402 Insufficient balance</code>. This is an account state, not a token
               permission. Add credits under{" "}
               <a
@@ -337,11 +338,12 @@ export function Catalog({
       {!loading && unpricedCount > 0 && (
         <div className="notice pricing-notice" role="status">
           <strong>Why some prices are unavailable.</strong>{" "}
-          Cloudflare's catalog includes models whose pricing is not returned by the catalog API. Of
-          the {unpricedCount} models without a billable price here, {unpricedThirdPartyCount} are
-          third-party models; Cloudflare does not publish their provider rates in this API. The
-          remaining {unpricedCloudflareCount} Cloudflare-hosted models also have no price field in
-          the response, so the app leaves them unpriced rather than guessing.
+          Cloudflare's account catalog supplies pricing for many third-party models, but the
+          published model list is broader than the account catalog. Of the {unpricedCount} models
+          without a billable price here, {unpricedThirdPartyCount} are third-party models not
+          returned by the account catalog. The remaining {unpricedCloudflareCount} Cloudflare-hosted
+          models also have no price field in the available responses, so the app leaves them
+          unpriced rather than guessing.
         </div>
       )}
 
@@ -417,7 +419,7 @@ export function Catalog({
  * Escape hatch for models Cloudflare will run but will not list.
  *
  * The runner only needs an id, so any valid model identifier works here —
- * including every third-party model, none of which appear in the catalog API.
+ * including third-party models that are not returned by the account catalog.
  */
 function ModelIdEntry() {
   const [value, setValue] = useState("");

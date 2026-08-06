@@ -6,11 +6,13 @@ import type { PriceEntry, PriceInfo } from "../../shared/types";
  * of the catalog, so any hardcoded list would be both stale and incomplete.
  *
  * Resolution order:
- *   1. `GET /ai/models/search?format=openrouter` — normalized token pricing that
+ *   1. The authenticated account catalog's `pricing` map from
+ *      `GET /ai/catalog/models` — Unified Billing prices for available models.
+ *   2. `GET /ai/models/search?format=openrouter` — normalized token pricing that
  *      spans Cloudflare-hosted *and* third-party models.
- *   2. The default catalog response's own metadata — where non-token units
+ *   3. The default catalog response's own metadata — where non-token units
  *      (per image, per step, per audio minute) and neuron rates live.
- *   3. Nothing. A model with no published price renders as exactly that.
+ *   4. Nothing. A model with no published price renders as exactly that.
  */
 
 const EMPTY: PriceInfo = { entries: [], source: "none" };
@@ -85,10 +87,25 @@ export function priceFromOpenRouter(pricing: unknown): PriceEntry[] {
  */
 export function priceFromCatalogItem(item: unknown): PriceEntry[] {
   if (!item || typeof item !== "object") return [];
-  const properties = (item as { properties?: unknown }).properties;
-  if (!Array.isArray(properties)) return [];
-
+  const record = item as Record<string, unknown>;
   const entries: PriceEntry[] = [];
+
+  // The authenticated account catalog uses a pricing map such as
+  // `{ "Default (per second)": 0.15 }`. It is intentionally handled only
+  // when `model_id` is present so an OpenRouter `{prompt, completion}` object
+  // cannot be mistaken for already-normalized catalog pricing.
+  if (typeof record.model_id === "string" && record.pricing && typeof record.pricing === "object") {
+    for (const [unit, rawPrice] of Object.entries(record.pricing as Record<string, unknown>)) {
+      const price = toNumber(rawPrice);
+      if (price === null) continue;
+      entries.push({ unit, price, currency: "USD" });
+    }
+    if (entries.length) return entries;
+  }
+
+  const properties = record.properties;
+  if (!Array.isArray(properties)) return entries;
+
   for (const property of properties) {
     if (!property || typeof property !== "object") continue;
     const id = String(
@@ -152,8 +169,16 @@ export class PriceIndex {
 }
 
 /** Applies the fallback chain for one model. */
-export function resolvePrice(id: string, catalogItem: unknown, index?: PriceIndex): PriceInfo {
-  const fromIndex = index?.lookup(id);
+export function resolvePrice(
+  id: string,
+  catalogItem: unknown,
+  marketplaceIndex?: PriceIndex,
+  accountIndex?: PriceIndex,
+): PriceInfo {
+  const fromAccount = accountIndex?.lookup(id);
+  if (fromAccount?.length) return { entries: fromAccount, source: "catalog" };
+
+  const fromIndex = marketplaceIndex?.lookup(id);
   if (fromIndex?.length) return { entries: fromIndex, source: "openrouter" };
 
   const fromCatalog = priceFromCatalogItem(catalogItem);

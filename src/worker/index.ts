@@ -42,8 +42,29 @@ app.get("/api/models", async (c) => {
 });
 
 /**
+ * GET /api/catalog/models — Cloudflare's authenticated account catalog.
+ *
+ * Unlike `/ai/models/search`, this endpoint includes Unified Billing models and
+ * their per-model pricing. It is still scoped to the visitor's own account and
+ * token by the same proxy used for every other API request.
+ */
+app.get("/api/catalog/models", async (c) => {
+  try {
+    const creds = getCredentials(c);
+    const query = new URLSearchParams();
+    for (const key of ["page", "per_page"] as const) {
+      const value = c.req.query(key);
+      if (value !== undefined && value !== "") query.set(key, value);
+    }
+    return await proxyToCloudflare(creds, aiUrl(creds, "catalog/models", query), { method: "GET" });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+
+/**
  * GET /api/catalog/docs — the models Cloudflare publishes but does not serve
- * through the catalog API (every third-party model).
+ * through the public model-search or this account's catalog.
  *
  * Fetched and parsed server-side because the browser cannot reach the docs
  * origin. Needs no credentials: it is public information.
