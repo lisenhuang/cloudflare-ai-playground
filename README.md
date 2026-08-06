@@ -81,27 +81,34 @@ meaningless for them.
 
 ## Third-party models
 
-Cloudflare's catalog API (`/ai/models/search`) returns **only Workers AI models** — 61 on a typical
-account, or 76 including deprecated ones. Third-party models (Anthropic, Google, OpenAI, ElevenLabs,
-Black Forest Labs …) are **never listed by it**, under any parameter: `search=claude`,
-`author=anthropic` and `task=Text-to-Video` all return zero. The `total_count: 286` the endpoint
-reports is not the number it will actually give you.
+Cloudflare's catalog API (`/ai/models/search`) returns **only Workers AI models** — verified against
+a live account, with credits loaded. `search=claude`, `author=anthropic` and `task=Text-to-Video` all
+return zero, and its `total_count: 286` does not match the 61 it actually hands over. Credits do not
+change this: they gate *running* a third-party model, not listing it.
 
-They do, however, **run** through the same `/ai/run` endpoint, so the app reaches them by ID instead
-of by listing:
+Since the models are runnable but unlisted, the app takes the list from Cloudflare's own **published
+catalog** instead. The Worker fetches `developers.cloudflare.com/ai/models` server-side (the browser
+cannot, for CORS reasons), parses the structured `data-*` attributes on each model cell, and merges
+the result with the API catalog — API records win where both exist, since they carry pricing. That
+brings the grid to ~218 models, ~139 of them third-party.
+
+This is a live fetch on every cache miss, not a list checked into the repo. It is also **HTML
+parsing**, so it is the most fragile part of this codebase: if Cloudflare changes that page's markup
+it returns nothing, and the app falls back to showing Workers AI models only. That failure is
+visible in the **Catalog coverage** panel rather than silent, and `Open a model by ID` always works
+regardless.
+
+To actually run one:
 
 1. Put credits in your [AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway)
    (**Credits Available → Manage → Top-up**), or store a provider key on the gateway for BYOK.
-   Without either, running one returns `402 Insufficient balance`.
-2. Use **Open model by ID** on the catalog page — e.g. `anthropic/claude-opus-5`. IDs are listed in
-   [Cloudflare's third-party catalog](https://developers.cloudflare.com/ai/models/?providers=third-party).
+   Without either, running returns `402 Insufficient balance`.
+2. Note Cloudflare adds a **5% fee** on credits bought through Unified Billing; inference rates
+   themselves pass through without markup.
 
-These models publish no input schema (`/ai/models/schema` returns 404), so the runner opens its JSON
-editor seeded with a chat-shaped template. They reply in their provider's native format — the output
-renderer handles Anthropic content blocks and OpenAI `choices` alongside Cloudflare's own shape.
-
-Note that Cloudflare adds a **5% fee** on credits bought through Unified Billing ($100 of credit
-costs $105); inference rates themselves pass through without markup.
+Third-party models publish no input schema (`/ai/models/schema` returns 404), so the runner opens its
+JSON editor seeded with a chat-shaped template. They reply in their provider's native format — the
+output renderer handles Anthropic content blocks and OpenAI `choices` alongside Cloudflare's shape.
 
 ## Caching
 

@@ -180,30 +180,21 @@ export function Catalog({
         Surfaced prominently rather than buried: an empty third-party list looks
         like a broken app, when it is actually an account billing state.
       */}
+      {/*
+        Only shown when the published-catalog fetch failed. Normally third-party
+        models are listed and this stays hidden.
+      */}
       {!loading && models.length > 0 && thirdPartyCount === 0 && (
         <div className="billing-notice" role="status">
-          <strong>Third-party models are runnable, but Cloudflare does not list them.</strong>
+          <strong>Third-party models could not be listed.</strong>
           <p>
-            The catalog API only ever returns Workers AI models, so Anthropic, Google, OpenAI and the
-            rest cannot appear in this grid — that is an API limitation, not a missing permission or
-            an empty account. They <em>do</em> run through the same endpoint: open one by ID below.
-            Running one needs credits in your AI Gateway (or a provider key via BYOK); without them
-            it returns <code>402 Insufficient balance</code>.
+            Cloudflare's catalog API only ever returns Workers AI models, so this app reads the
+            published catalog for the rest — and that lookup came back empty (see Catalog coverage
+            below). They still run through the same endpoint, so you can open one by ID. Running one
+            needs credits in your AI Gateway, or a provider key via BYOK; without them it returns{" "}
+            <code>402 Insufficient balance</code>.
           </p>
           <ModelIdEntry />
-          <p className="muted small">
-            Browse IDs in{" "}
-            <a
-              href="https://developers.cloudflare.com/ai/models/?providers=third-party"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Cloudflare's third-party list ↗
-            </a>{" "}
-            — for example <code>anthropic/claude-opus-5</code> or{" "}
-            <code>google/gemini-3.6-flash</code>. These models publish no input schema, so the runner
-            opens its JSON editor with a chat-shaped starting template.
-          </p>
           <details className="billing-steps">
             <summary>How to add credits</summary>
             <ol>
@@ -316,6 +307,16 @@ export function Catalog({
           )}
         </details>
       )}
+
+      {/* Always available: any valid model id works, listed or not. */}
+      <details className="id-entry-panel">
+        <summary>Open a model by ID</summary>
+        <p className="muted small">
+          Any identifier Cloudflare will run works here, whether or not it appears in the grid — for
+          example <code>anthropic/claude-opus-5</code> or <code>@cf/meta/llama-3.1-8b-instruct</code>.
+        </p>
+        <ModelIdEntry />
+      </details>
 
       {error && models.length > 0 && (
         <div className="notice" role="status">

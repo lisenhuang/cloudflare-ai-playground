@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { aiUrl, errorResponse, getCredentials, proxyToCloudflare, ProxyError } from "./cf-proxy";
+import { fetchDocsCatalog } from "./docs-catalog";
 
 interface Env {
   ASSETS: { fetch: (req: Request) => Promise<Response> };
@@ -38,6 +39,22 @@ app.get("/api/models", async (c) => {
   } catch (err) {
     return errorResponse(err);
   }
+});
+
+/**
+ * GET /api/catalog/docs — the models Cloudflare publishes but does not serve
+ * through the catalog API (every third-party model).
+ *
+ * Fetched and parsed server-side because the browser cannot reach the docs
+ * origin. Needs no credentials: it is public information.
+ */
+app.get("/api/catalog/docs", async (c) => {
+  const models = await fetchDocsCatalog();
+  return c.json(
+    { models, count: models.length },
+    200,
+    { "Cache-Control": "public, max-age=3600" },
+  );
 });
 
 /** GET /api/schema?model=... — the input/output JSON Schema that drives the form. */

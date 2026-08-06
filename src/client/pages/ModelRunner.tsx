@@ -361,6 +361,20 @@ export function ModelRunner({ creds, model }: { creds: Credentials; model: Model
           the untouched catalog record so classification questions can be
           answered by looking rather than inferring.
         */}
+        {model.thirdParty && (
+          <p className="third-party-note muted small">
+            Third-party model — billed through AI Gateway. Needs credits in your gateway or a
+            provider key via BYOK, otherwise running it returns <code>402 Insufficient balance</code>.{" "}
+            <a
+              href="https://dash.cloudflare.com/?to=/:account/ai/ai-gateway"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Check balance ↗
+            </a>
+          </p>
+        )}
+
         <details className="raw-record">
           <summary>Raw catalog record from Cloudflare</summary>
           {model.raw ? (

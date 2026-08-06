@@ -1942,3 +1942,34 @@ select.field-input {
     flex-direction: column;
   }
 }
+
+.id-entry-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.id-entry-panel summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+
+.id-entry-panel summary:hover {
+  color: var(--text);
+}
+
+.id-entry-panel > p {
+  margin-top: 8px;
+}
+
+.third-party-note {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  line-height: 1.55;
+}

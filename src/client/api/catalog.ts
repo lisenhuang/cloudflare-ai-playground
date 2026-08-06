@@ -81,6 +81,29 @@ async function runPass(
 const SOURCE_IDS = [1, 2, 3, 4, 5];
 
 /**
+ * Models Cloudflare publishes but does not return from the catalog API.
+ *
+ * Every third-party model falls in this gap: runnable through /ai/run, absent
+ * from /ai/models/search under any parameter. The Worker fetches Cloudflare's
+ * published catalog for us, so this stays a live lookup rather than a list
+ * checked into the repo. A failure here is never fatal — it just means the grid
+ * shows Workers AI models only, as it did before.
+ */
+async function fetchPublishedCatalog(passes: LoadPass[]): Promise<unknown[]> {
+  try {
+    const response = await fetch("/api/catalog/docs");
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const body = (await response.json()) as { models?: unknown[] };
+    const models = Array.isArray(body.models) ? body.models : [];
+    passes.push({ label: "published catalog", items: models.length });
+    return models;
+  } catch (err) {
+    passes.push({ label: "published catalog", items: 0, error: (err as Error).message });
+    return [];
+  }
+}
+
+/**
  * Loads the entire catalog once, then filters and sorts in memory.
  *
  * Two passes are unioned so that no model is missed: the default format carries
@@ -95,19 +118,20 @@ const SOURCE_IDS = [1, 2, 3, 4, 5];
 export async function loadAllModels(creds: Credentials): Promise<CatalogLoad> {
   const passes: LoadPass[] = [];
 
-  const [defaultItems, marketplaceItems, ...sourceResults] = await Promise.all([
+  const [defaultItems, marketplaceItems, publishedItems, ...sourceResults] = await Promise.all([
     runPass(creds, "default", {}, passes),
     runPass(creds, "marketplace", { format: "openrouter" }, passes),
+    fetchPublishedCatalog(passes),
     ...SOURCE_IDS.map((source) => runPass(creds, `source=${source}`, { source }, passes)),
   ]);
 
   const priceIndex = buildPriceIndexFromItems(marketplaceItems);
 
-  // Marketplace and per-source entries first, then default-format entries
-  // overwrite them — last write wins, and the default format carries the
-  // richest metadata (task object, description, capabilities).
+  // Published-catalog entries first, then the API's own records overwrite them:
+  // the API is authoritative and carries pricing, while the published catalog
+  // exists only to cover the models the API refuses to list at all.
   const byId = new Map<string, unknown>();
-  for (const item of [...marketplaceItems, ...sourceResults.flat(), ...defaultItems]) {
+  for (const item of [...publishedItems, ...marketplaceItems, ...sourceResults.flat(), ...defaultItems]) {
     const id = extractId(item);
     if (id) byId.set(id, item);
   }
