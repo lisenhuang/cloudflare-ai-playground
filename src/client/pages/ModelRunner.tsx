@@ -11,7 +11,7 @@ import { RequestFailed, fetchModelSchema, pollQueuedJob, runModel } from "../api
 import { SchemaForm } from "../form/SchemaForm";
 import { getVariants, initialValues, missingRequired, pruneValues } from "../form/schema";
 import { OutputView, type Outcome } from "../output/OutputView";
-import { formatEntry } from "../pricing/resolve";
+import { dashboardPricingUrl, formatEntry } from "../pricing/resolve";
 import { navigate } from "../state/useCatalog";
 
 const SCHEMA_CACHE_PREFIX = "cf-models.schema.";
@@ -411,12 +411,23 @@ export function ModelRunner({ creds, model }: { creds: Credentials; model: Model
             </>
           ) : (
             <p className="muted">
-              Cloudflare does not publish a price for this model through the API. Nothing is estimated
-              here — check{" "}
-              <a href={CF_MODEL_CATALOG_URL} target="_blank" rel="noreferrer">
-                Cloudflare's model catalog ↗
-              </a>
-              .
+              {model.thirdParty
+                ? "Cloudflare keeps this third-party model's numeric price in the account dashboard rather than returning it in the public catalog API."
+                : "Cloudflare does not publish a price for this model through the API."}{" "}
+              {model.thirdParty ? (
+                <>
+                  <a href={dashboardPricingUrl(model.id)} target="_blank" rel="noreferrer">
+                    View pricing in the Cloudflare dashboard ↗
+                  </a>{" "}
+                  Nothing is estimated here.
+                </>
+              ) : (
+                <>Nothing is estimated here — check{" "}
+                  <a href={CF_MODEL_CATALOG_URL} target="_blank" rel="noreferrer">
+                    Cloudflare's model catalog ↗
+                  </a>
+                </>
+              )}
             </p>
           )}
         </div>

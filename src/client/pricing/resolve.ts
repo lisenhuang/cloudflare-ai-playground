@@ -15,6 +15,16 @@ import type { PriceEntry, PriceInfo } from "../../shared/types";
 
 const EMPTY: PriceInfo = { entries: [], source: "none" };
 
+/** Public model pages link third-party pricing to this account-specific view. */
+export function dashboardPricingUrl(id: string): string {
+  const modelPath = id
+    .replace(/^\/+/, "")
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `https://dash.cloudflare.com/?to=/:account/ai/models/${modelPath}`;
+}
+
 /** OpenRouter expresses prices in USD per single unit, as strings. */
 const OPENROUTER_UNITS: Record<string, { unit: string; perMillion: boolean }> = {
   prompt: { unit: "per M input tokens", perMillion: true },

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Model } from "../../shared/types";
-import { summarizePrice } from "../pricing/resolve";
+import { dashboardPricingUrl, summarizePrice } from "../pricing/resolve";
 import { navigate } from "../state/useCatalog";
 
 /** Deterministic accent per author so the grid reads as grouped at a glance. */
@@ -75,6 +75,17 @@ export function ModelCard({ model }: { model: Model }) {
         <div className="price-block">
           {price ? (
             <span className="price-value">{price}</span>
+          ) : model.thirdParty ? (
+            <a
+              className="price-missing"
+              href={dashboardPricingUrl(model.id)}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this model's pricing in the Cloudflare dashboard"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Price in dashboard ↗
+            </a>
           ) : (
             <span className="price-missing" title="Cloudflare does not publish a price for this model via the API">
               Price not published

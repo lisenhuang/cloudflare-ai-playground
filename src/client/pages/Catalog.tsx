@@ -9,6 +9,7 @@ import {
 } from "../api/catalog";
 import { FilterMenu } from "../components/FilterMenu";
 import { ModelCard } from "../components/ModelCard";
+import { summarizePrice } from "../pricing/resolve";
 import { describeAge } from "../state/catalogCache";
 import { navigate } from "../state/useCatalog";
 import { saveCatalogScroll, takeCatalogScroll } from "../state/useFilters";
@@ -46,10 +47,18 @@ export function Catalog({
   const facets = useMemo(() => buildFacets(models), [models]);
   const visible = useMemo(() => filterModels(models, filters), [models, filters]);
 
+  // Match what cards actually render. A neuron-only entry is useful in the
+  // detail view, but it is not a billable USD price and the card correctly
+  // displays it as unavailable.
   const pricedCount = useMemo(
-    () => models.filter((model) => model.pricing.entries.length > 0).length,
+    () => models.filter((model) => summarizePrice(model.pricing)).length,
     [models],
   );
+  const unpricedCount = models.length - pricedCount;
+  const unpricedThirdPartyCount = models.filter(
+    (model) => model.thirdParty && !summarizePrice(model.pricing),
+  ).length;
+  const unpricedCloudflareCount = unpricedCount - unpricedThirdPartyCount;
 
   const cloudflareCount = useMemo(() => models.filter((m) => m.cloudflareHosted).length, [models]);
   const thirdPartyCount = models.length - cloudflareCount;
@@ -325,6 +334,17 @@ export function Catalog({
         </div>
       )}
 
+      {!loading && unpricedCount > 0 && (
+        <div className="notice pricing-notice" role="status">
+          <strong>Why some prices are unavailable.</strong>{" "}
+          Cloudflare's catalog includes models whose pricing is not returned by the catalog API. Of
+          the {unpricedCount} models without a billable price here, {unpricedThirdPartyCount} are
+          third-party models; Cloudflare does not publish their provider rates in this API. The
+          remaining {unpricedCloudflareCount} Cloudflare-hosted models also have no price field in
+          the response, so the app leaves them unpriced rather than guessing.
+        </div>
+      )}
+
       <div className="result-line">
         {loading ? (
           <span className="loading-line">
@@ -334,8 +354,8 @@ export function Catalog({
           <>
             <span>
               <strong>{visible.length}</strong> of {models.length} models
-              {pricedCount < models.length && models.length > 0 && (
-                <span className="muted"> · {models.length - pricedCount} without published pricing</span>
+              {unpricedCount > 0 && models.length > 0 && (
+                <span className="muted"> · {unpricedCount} without API pricing</span>
               )}
             </span>
             <span className="result-actions">
