@@ -1,59 +1,89 @@
 import type { Credentials, Model } from "../../shared/types";
-import { fetchCatalog } from "./client";
-import { buildPriceIndex, extractItems, extractPageInfo, normalizeModel } from "./normalize";
+import { fetchCatalog, type CatalogQuery } from "./client";
+import {
+  buildPriceIndexFromItems,
+  extractId,
+  extractItems,
+  extractPageInfo,
+  normalizeModel,
+} from "./normalize";
 
 const PAGE_SIZE = 100;
-const MAX_PAGES = 20; // 2,000 models — a backstop, not an expected limit.
+const MAX_PAGES = 50; // Backstop against a server that never reports completion.
+
+/**
+ * Walks every page of one catalog query.
+ *
+ * Termination is deliberately NOT based on the page size we asked for: the API
+ * caps `per_page` at its own maximum, so a short page relative to our request
+ * is normal and does not mean the end of the list. Stopping on that assumption
+ * silently truncated the catalog to a single page.
+ */
+async function fetchAllPages(creds: Credentials, base: CatalogQuery): Promise<unknown[]> {
+  const collected: unknown[] = [];
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const payload = await fetchCatalog(creds, { ...base, page, perPage: PAGE_SIZE });
+    const items = extractItems(payload);
+    if (!items.length) break;
+
+    collected.push(...items);
+
+    const info = extractPageInfo(payload);
+    if (info.total !== undefined && collected.length >= info.total) break;
+
+    // Compare against the server's own page size when it reports one; otherwise
+    // keep going until a page comes back empty.
+    const serverPageSize = info.perPage ?? items.length;
+    if (items.length < serverPageSize) break;
+  }
+
+  return collected;
+}
+
+/** A pass over the catalog. A failing pass is skipped, never fatal. */
+async function tryPass(creds: Credentials, base: CatalogQuery): Promise<unknown[]> {
+  try {
+    return await fetchAllPages(creds, base);
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Loads the entire catalog once, then filters and sorts in memory.
  *
- * The catalog is small (a couple of hundred models) and holding all of it makes
- * search, faceting and — crucially — sorting by price instant and correct.
- * Server-side pagination cannot sort by a field it does not rank on.
+ * Two passes are unioned so that no model is missed: the default format carries
+ * the richer metadata (task object, description, capabilities), while the
+ * marketplace format is the one that carries pricing — and the two do not
+ * always cover exactly the same set. Union, then prefer the richer record.
+ *
+ * Holding the whole catalog also makes search, faceting and sorting by price
+ * instant and correct; server-side pagination cannot rank on a field it does
+ * not sort by.
  */
 export async function loadAllModels(creds: Credentials): Promise<Model[]> {
-  // Pricing first, so every model can be priced as it is normalized.
-  const priceIndex = await loadPriceIndex(creds);
+  const [defaultItems, marketplaceItems] = await Promise.all([
+    fetchAllPages(creds, {}),
+    tryPass(creds, { format: "openrouter" }),
+  ]);
+
+  const priceIndex = buildPriceIndexFromItems(marketplaceItems);
+
+  // Marketplace entries first, then default-format entries overwrite them —
+  // last write wins, and the default format has the better metadata.
+  const byId = new Map<string, unknown>();
+  for (const item of [...marketplaceItems, ...defaultItems]) {
+    const id = extractId(item);
+    if (id) byId.set(id, item);
+  }
 
   const models: Model[] = [];
-  const seen = new Set<string>();
-
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const payload = await fetchCatalog(creds, { page, perPage: PAGE_SIZE });
-    const items = extractItems(payload);
-    if (!items.length) break;
-
-    for (const item of items) {
-      const model = normalizeModel(item, priceIndex);
-      if (model && !seen.has(model.id)) {
-        seen.add(model.id);
-        models.push(model);
-      }
-    }
-
-    const info = extractPageInfo(payload);
-    const total = info.total;
-    if (items.length < PAGE_SIZE) break;
-    if (total !== undefined && models.length >= total) break;
+  for (const item of byId.values()) {
+    const model = normalizeModel(item, priceIndex);
+    if (model) models.push(model);
   }
-
   return models;
-}
-
-/**
- * Fetches the OpenRouter-format catalog purely for its pricing data.
- *
- * A failure here is not fatal: pricing degrades to the catalog's own metadata,
- * and then to "not published". Never to a guess.
- */
-async function loadPriceIndex(creds: Credentials) {
-  try {
-    const payload = await fetchCatalog(creds, { format: "openrouter", perPage: 1000, page: 1 });
-    return buildPriceIndex(payload);
-  } catch {
-    return undefined;
-  }
 }
 
 export type SortOrder = "name" | "price-asc" | "price-desc" | "task";

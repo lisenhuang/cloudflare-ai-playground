@@ -28,7 +28,9 @@ function toNumber(value: unknown): number | undefined {
 }
 
 /** The identifier used when calling `/ai/run` — the one field we cannot guess wrong. */
-function extractId(item: Dict): string | undefined {
+export function extractId(raw: unknown): string | undefined {
+  const item = asDict(raw);
+  if (!item) return undefined;
   const candidates = [item.name, item.id, item.model, item.model_id];
   // A model id always contains a slash; a bare UUID `id` field does not.
   for (const candidate of candidates) {
@@ -68,10 +70,17 @@ function extractTask(item: Dict): string {
     const MODALITIES: Record<string, string> = {
       "text->text": "Text Generation",
       "text+image->text": "Image-to-Text",
+      "image->text": "Image-to-Text",
       "text->image": "Text-to-Image",
+      "image->image": "Image-to-Image",
+      "text+image->image": "Image-to-Image",
       "text->video": "Text-to-Video",
+      "image->video": "Image-to-Video",
+      "text+image->video": "Image-to-Video",
       "text->audio": "Text-to-Speech",
+      "text->music": "Music Generation",
       "audio->text": "Automatic Speech Recognition",
+      "text->embedding": "Text Embeddings",
     };
     return MODALITIES[modality] ?? modality;
   }
@@ -187,10 +196,10 @@ export function extractPageInfo(payload: unknown): { page?: number; perPage?: nu
   };
 }
 
-/** Builds the price index from an OpenRouter-format catalog response. */
-export function buildPriceIndex(payload: unknown): PriceIndex {
+/** Builds the price index from already-collected OpenRouter-format items. */
+export function buildPriceIndexFromItems(items: unknown[]): PriceIndex {
   const index = new PriceIndex();
-  for (const raw of extractItems(payload)) {
+  for (const raw of items) {
     const item = asDict(raw);
     if (!item) continue;
     const id = extractId(item);
@@ -198,4 +207,9 @@ export function buildPriceIndex(payload: unknown): PriceIndex {
     index.add(id, priceFromOpenRouter(item.pricing));
   }
   return index;
+}
+
+/** Builds the price index from a raw OpenRouter-format catalog response. */
+export function buildPriceIndex(payload: unknown): PriceIndex {
+  return buildPriceIndexFromItems(extractItems(payload));
 }

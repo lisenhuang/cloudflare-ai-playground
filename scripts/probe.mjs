@@ -61,15 +61,39 @@ function items(payload) {
   return [];
 }
 
+/**
+ * Walks every page. Termination must not assume the server honours the
+ * requested per_page — it caps at its own maximum, and treating a short page as
+ * the end silently truncates the catalog.
+ */
+async function collectAll(label, query) {
+  const all = [];
+  for (let page = 1; page <= 50; page++) {
+    const url = `models/search?${query}&per_page=100&page=${page}`;
+    const response = await call(page === 1 ? label : `${label}-p${page}`, url);
+    const batch = items(response?.body);
+    if (!batch.length) break;
+    all.push(...batch);
+
+    const info = response?.body?.result_info ?? {};
+    if (info.total_count !== undefined && all.length >= info.total_count) break;
+    const serverPageSize = info.per_page ?? batch.length;
+    if (batch.length < serverPageSize) break;
+  }
+  return all;
+}
+
 await mkdir(OUT_DIR, { recursive: true });
 
 console.log("\nProbing the Cloudflare AI API\n");
 
-// 1. Default catalog format.
+// 1. Default catalog format — paginated to exhaustion.
 const catalog = await call("models-search", "models/search?per_page=100&page=1");
+const allDefault = await collectAll("models-search-all", "");
 
 // 2. Marketplace format — the primary pricing source.
 const marketplace = await call("models-search-openrouter", "models/search?format=openrouter&per_page=1000");
+const allMarketplace = await collectAll("models-search-openrouter-all", "format=openrouter");
 
 // 3. A model schema, using whichever model the catalog returned first.
 const first = items(catalog?.body)[0];
@@ -85,9 +109,36 @@ if (sampleId) {
 console.log("\n─── Findings ───\n");
 
 const catalogItems = items(catalog?.body);
-console.log(`Catalog models on page 1 : ${catalogItems.length}`);
+console.log(`Models on page 1         : ${catalogItems.length}  (asked for 100)`);
+console.log(`Server per_page cap      : ${catalog?.body?.result_info?.per_page ?? "not reported"}`);
 const totalCount = catalog?.body?.result_info?.total_count;
 if (totalCount !== undefined) console.log(`Total reported           : ${totalCount}`);
+console.log(`Collected, default fmt   : ${allDefault.length}`);
+console.log(`Collected, marketplace   : ${allMarketplace.length}`);
+
+// The union is what the app actually shows.
+const idOf = (m) => m.name ?? m.id ?? m.model;
+const union = new Set([...allDefault, ...allMarketplace].map(idOf).filter(Boolean));
+console.log(`Union (what the app gets): ${union.size}`);
+if (totalCount !== undefined && union.size < totalCount) {
+  console.log(`  ⚠ ${totalCount - union.size} models are NOT being collected.`);
+}
+
+// Task-type breakdown, directly comparable to the dashboard's filter dropdown.
+const taskCounts = new Map();
+for (const m of allDefault) {
+  const task = m.task?.name ?? m.task ?? m.architecture?.modality ?? "(none)";
+  taskCounts.set(task, (taskCounts.get(task) ?? 0) + 1);
+}
+console.log("\nTask types found (compare against the dashboard dropdown):");
+for (const [task, count] of [...taskCounts.entries()].sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${String(count).padStart(4)}  ${task}`);
+}
+for (const expected of ["Text-to-Video", "Image-to-Video", "Music Generation"]) {
+  if (![...taskCounts.keys()].some((t) => String(t).toLowerCase() === expected.toLowerCase())) {
+    console.log(`  ⚠ "${expected}" is missing from the default catalog format.`);
+  }
+}
 
 if (first) {
   console.log(`Top-level fields         : ${Object.keys(first).join(", ")}`);
