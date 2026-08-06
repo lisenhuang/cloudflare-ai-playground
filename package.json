@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 2324",
     "build": "tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "deploy": "vite build && wrangler deploy",

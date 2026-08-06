@@ -23,7 +23,7 @@ Built with **Cloudflare Workers + Hono + React**.
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # http://localhost:2324
 ```
 
 Deploy to Cloudflare Workers:
