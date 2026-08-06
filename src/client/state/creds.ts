@@ -3,12 +3,12 @@ import type { Credentials } from "../../shared/types";
 const STORAGE_KEY = "cf-models.creds";
 
 /**
- * Credentials live in localStorage and nowhere else.
+ * Credentials live in localStorage and nowhere else. OAuth access tokens are
+ * short-lived; manual API tokens are supported only as the explicit fallback.
  *
  * This app is bring-your-own-key: the token is sent only to our own `/api/*`
- * proxy, which forwards it to api.cloudflare.com without storing it. Because a
- * Cloudflare API token is a powerful credential, the setup screen steers users
- * toward a token scoped to Workers AI alone.
+ * proxy, which forwards it to api.cloudflare.com without storing it. The setup
+ * screen steers new users toward scoped Cloudflare OAuth.
  */
 export function loadCredentials(): Credentials | null {
   try {
@@ -20,6 +20,9 @@ export function loadCredentials(): Credentials | null {
       accountId: parsed.accountId,
       apiToken: parsed.apiToken,
       gatewayId: parsed.gatewayId || undefined,
+      authMethod: parsed.authMethod === "oauth" ? "oauth" : "token",
+      refreshToken: parsed.refreshToken || undefined,
+      expiresAt: typeof parsed.expiresAt === "number" ? parsed.expiresAt : undefined,
     };
   } catch {
     return null;

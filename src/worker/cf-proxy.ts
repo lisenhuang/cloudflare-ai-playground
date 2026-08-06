@@ -27,7 +27,7 @@ export class ProxyError extends Error {
  */
 export function getCredentials(c: Context): Credentials {
   const accountId = c.req.header(CRED_HEADERS.accountId)?.trim();
-  const apiToken = c.req.header(CRED_HEADERS.apiToken)?.trim();
+  const apiToken = getApiToken(c);
   const gatewayId = c.req.header(CRED_HEADERS.gatewayId)?.trim();
 
   if (!accountId || !apiToken) {
@@ -45,6 +45,19 @@ export function getCredentials(c: Context): Credentials {
     );
   }
   return { accountId, apiToken, gatewayId: gatewayId || undefined };
+}
+
+/** Gets the bearer credential for account discovery before an account is known. */
+export function getApiToken(c: Context): string {
+  const apiToken = c.req.header(CRED_HEADERS.apiToken)?.trim();
+  if (!apiToken) {
+    throw new ProxyError(
+      401,
+      "Missing Cloudflare credentials.",
+      "Sign in with Cloudflare or add an API token on the setup screen.",
+    );
+  }
+  return apiToken;
 }
 
 function authHeaders(creds: Credentials, extra?: Record<string, string>): Headers {
@@ -75,6 +88,12 @@ export function accountUrl(creds: Credentials, path: string, query?: URLSearchPa
   const clean = path.replace(/^\/+/, "");
   const qs = query && [...query.keys()].length ? `?${query.toString()}` : "";
   return `${CF_API_BASE}/accounts/${creds.accountId}/${clean}${qs}`;
+}
+
+/** Builds an account-list URL, which is intentionally not account-scoped. */
+export function accountsUrl(query?: URLSearchParams): string {
+  const qs = query && [...query.keys()].length ? `?${query.toString()}` : "";
+  return `${CF_API_BASE}/accounts${qs}`;
 }
 
 /**
@@ -125,6 +144,29 @@ export async function proxyToCloudflare(
     status: upstream.status,
     headers: outHeaders,
   });
+}
+
+/** Proxies the account-list request used by OAuth before an account is selected. */
+export async function proxyTokenToCloudflare(token: string, url: string): Promise<Response> {
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    throw new ProxyError(
+      502,
+      `Could not reach the Cloudflare API: ${(err as Error).message}`,
+      "Check your network connection and try again.",
+    );
+  }
+
+  const outHeaders = new Headers();
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) outHeaders.set("Content-Type", contentType);
+  outHeaders.set("Cache-Control", "no-store");
+  return new Response(upstream.body, { status: upstream.status, headers: outHeaders });
 }
 
 /** Turns any thrown error into the JSON envelope the client expects. */

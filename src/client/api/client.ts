@@ -1,4 +1,5 @@
 import { CRED_HEADERS, type ApiError, type Credentials, type ModelSchema } from "../../shared/types";
+import { refreshOAuthToken, updateOAuthCredentials } from "../auth/oauth";
 
 export class RequestFailed extends Error {
   constructor(readonly error: ApiError) {
@@ -57,11 +58,28 @@ async function toApiError(response: Response): Promise<ApiError> {
   return { status: response.status, message, code, hint };
 }
 
-async function apiFetch(creds: Credentials, path: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(path, {
+async function sendApiFetch(creds: Credentials, path: string, init?: RequestInit): Promise<Response> {
+  return fetch(path, {
     ...init,
     headers: { ...credHeaders(creds), ...(init?.headers as Record<string, string> | undefined) },
   });
+}
+
+async function apiFetch(creds: Credentials, path: string, init?: RequestInit): Promise<Response> {
+  let response = await sendApiFetch(creds, path, init);
+
+  // Cloudflare OAuth access tokens are short-lived. Refresh once on expiry and
+  // retry the original request; API-token users keep the existing behavior.
+  if (response.status === 401 && creds.refreshToken) {
+    try {
+      const refreshed = updateOAuthCredentials(creds, await refreshOAuthToken(creds.refreshToken));
+      Object.assign(creds, refreshed);
+      response = await sendApiFetch(creds, path, init);
+    } catch {
+      // Keep the original 401 so the setup UI can explain the failure.
+    }
+  }
+
   if (!response.ok) throw new RequestFailed(await toApiError(response));
   return response;
 }
@@ -146,6 +164,34 @@ export async function fetchCreditBalance(creds: Credentials): Promise<CreditBala
     }
     throw err;
   }
+}
+
+export interface CloudflareAccount {
+  id: string;
+  name: string;
+}
+
+/** Lists the accounts the OAuth user can authorize before an account is chosen. */
+export async function fetchCloudflareAccounts(apiToken: string): Promise<CloudflareAccount[]> {
+  const response = await fetch("/api/accounts", {
+    headers: { [CRED_HEADERS.apiToken]: apiToken },
+  });
+  if (!response.ok) throw new RequestFailed(await toApiError(response));
+  const body = (await response.json()) as { result?: unknown };
+  if (!Array.isArray(body.result)) {
+    throw new RequestFailed({
+      status: 502,
+      message: "Cloudflare returned no accounts.",
+      hint: "Make sure your Cloudflare user has access to an account.",
+    });
+  }
+  return body.result.filter(
+    (account): account is CloudflareAccount =>
+      Boolean(account) &&
+      typeof account === "object" &&
+      typeof (account as { id?: unknown }).id === "string" &&
+      typeof (account as { name?: unknown }).name === "string",
+  );
 }
 
 export async function fetchModelSchema(creds: Credentials, model: string): Promise<ModelSchema> {

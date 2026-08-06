@@ -1,5 +1,15 @@
 import { Hono } from "hono";
-import { accountUrl, aiUrl, errorResponse, getCredentials, proxyToCloudflare, ProxyError } from "./cf-proxy";
+import {
+  accountUrl,
+  accountsUrl,
+  aiUrl,
+  errorResponse,
+  getApiToken,
+  getCredentials,
+  proxyTokenToCloudflare,
+  proxyToCloudflare,
+  ProxyError,
+} from "./cf-proxy";
 import { fetchDocsCatalog } from "./docs-catalog";
 
 interface Env {
@@ -7,6 +17,17 @@ interface Env {
 }
 
 const app = new Hono<{ Bindings: Env }>();
+
+/** GET /api/accounts — discovers accounts after OAuth consent. */
+app.get("/api/accounts", async (c) => {
+  try {
+    const token = getApiToken(c);
+    const query = new URLSearchParams({ per_page: "100" });
+    return await proxyTokenToCloudflare(token, accountsUrl(query));
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
 
 /** Query params the catalog endpoint understands; anything else is dropped. */
 const CATALOG_PARAMS = [

@@ -65,7 +65,9 @@ function AccountMenu({ creds, onDisconnect }: { creds: Credentials; onDisconnect
           <p className="account-label">Account</p>
           <code className="mono account-value">{creds.accountId}</code>
           <p className="account-label">Token</p>
-          <code className="mono account-value">{maskToken(creds.apiToken)}</code>
+          <code className="mono account-value">
+            {creds.authMethod === "oauth" ? "Cloudflare OAuth" : maskToken(creds.apiToken)}
+          </code>
           {creds.gatewayId && (
             <>
               <p className="account-label">Gateway</p>
@@ -174,7 +176,7 @@ export default function App() {
     navigate("/setup");
   };
 
-  const needsSetup = !creds || route.name === "setup";
+  const needsSetup = !creds || route.name === "setup" || window.location.pathname === "/oauth/callback";
 
   return (
     <div className="app">

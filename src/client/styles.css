@@ -812,6 +812,51 @@ select.field-input {
   line-height: 1.6;
 }
 
+.oauth-connect {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.oauth-button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.oauth-help {
+  margin: 8px 0 0;
+}
+
+.account-picker {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
+.account-picker .primary-button {
+  justify-self: start;
+}
+
+.token-details {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.token-details summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.token-details summary:hover {
+  color: var(--text);
+}
+
 .setup-form {
   margin-top: 26px;
 }

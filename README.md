@@ -20,6 +20,8 @@ Built on Cloudflare Workers + Hono + React. Bring your own key.
 - **Reports real cost per run** from the `usage` payload and `cf-aig-*` response headers, plus a
   session total. Estimates are never substituted for what Cloudflare actually charged.
 - **Shows the current AI Gateway credit balance** in the header and refreshes it automatically.
+- **Uses Cloudflare OAuth with PKCE** as the primary sign-in; the manual API-token path remains
+  available under a collapsed fallback section.
 - **Follows your system theme** automatically, with an optional manual override.
 - **Works on phone and desktop**: two panes side by side on wide screens, tabbed panes on narrow.
 
@@ -30,7 +32,9 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Open the app and supply:
+Open the app and select **Continue with Cloudflare**. OAuth discovers the accounts you can access
+and asks for only the permissions needed by this playground. If OAuth is unavailable, expand
+**Use an API token instead**:
 
 | Field | Where to find it |
 | --- | --- |
@@ -49,19 +53,21 @@ path-based `/ai/run/{model}` route for `@cf/...` models, which needs no gateway.
 
 ## Security: this is a bring-your-own-key app
 
-Your token is kept in `localStorage` and sent only to this app's own `/api/*` proxy, which forwards
-it to `api.cloudflare.com` **without storing, caching, or logging it**. There are no secrets in
-`wrangler.jsonc` and no server-side account.
+OAuth tokens and manual tokens are kept in `localStorage` and sent only to this app's own `/api/*`
+proxy, which forwards them to `api.cloudflare.com` **without storing, caching, or logging them**.
+There are no secrets in `wrangler.jsonc` and no server-side account.
 
-That design has a real consequence worth stating plainly: **anyone who can run JavaScript on this
-origin can read the token.** So:
+The OAuth access token is scoped to the permissions approved on the Cloudflare consent screen. A
+manual token has a real consequence worth stating plainly: **anyone who can run JavaScript on this
+origin can read it.** So:
 
 - Scope the token to **Workers AI → Edit** and, if you want the balance, **AI Gateway → Read**, on a single account.
 - Give it an expiry.
 - If you deploy this publicly, understand that every visitor pays for their own inference — but also
   that an XSS bug on the page would expose their token. Do not add third-party scripts to it.
 
-Use the **Disconnect** button in the header to wipe the stored credentials.
+Use the **Disconnect** button in the header to wipe the stored credentials. OAuth access can also
+be revoked from Cloudflare.
 
 ## Pricing
 
@@ -144,7 +150,7 @@ gateway ID on your account.
 ```
 src/
   worker/
-    index.ts          Hono routes: /api/models, /api/schema, /api/run, /api/cf/* passthrough
+    index.ts          Hono routes: OAuth account discovery, catalog, schema, run, /api/cf/* passthrough
     cf-proxy.ts       Credential extraction, streaming upstream fetch, error normalization
   shared/types.ts     Types shared across the client/worker boundary
   client/
@@ -152,7 +158,7 @@ src/
     pricing/          API-sourced price resolution and unit formatting
     form/             JSON Schema → widget mapping, and the generated form
     output/           Task-type-aware output renderers
-    pages/            Setup, Catalog, ModelRunner
+    pages/            OAuth-first Setup, Catalog, ModelRunner
     state/            Credentials, theme, catalog hook, hash router
 scripts/probe.mjs     API shape probe
 ```

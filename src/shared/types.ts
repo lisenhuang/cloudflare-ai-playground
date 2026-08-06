@@ -9,6 +9,10 @@ export interface Credentials {
   apiToken: string;
   /** Optional. Required by the unified /ai/run endpoint for Workers AI models. */
   gatewayId?: string;
+  /** OAuth credentials are refreshed in the browser when the access token expires. */
+  authMethod?: "oauth" | "token";
+  refreshToken?: string;
+  expiresAt?: number;
 }
 
 /** Header names used to carry BYOK credentials from the browser to our proxy. */
