@@ -1924,3 +1924,21 @@ select.field-input {
     transition-duration: 0.01ms !important;
   }
 }
+
+.model-id-entry {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  max-width: 520px;
+}
+
+.model-id-entry .field-input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .model-id-entry {
+    flex-direction: column;
+  }
+}

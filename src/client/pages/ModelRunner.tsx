@@ -147,8 +147,19 @@ export function ModelRunner({ creds, model }: { creds: Credentials; model: Model
             ? err.error
             : { status: 500, message: (err as Error).message ?? "Could not load the model schema." },
         );
-        // Without a schema the JSON editor is the only way in — open it.
+        // Third-party models have no published schema, so the JSON editor is
+        // the only way in. Seed it with a chat-shaped starting point rather
+        // than an empty object — it is a template to edit, not a claim about
+        // this model's parameters.
         setJsonMode(true);
+        setJsonText(
+          JSON.stringify(
+            { messages: [{ role: "user", content: "" }], max_tokens: 1024 },
+            null,
+            2,
+          ),
+        );
+        setValues({ messages: [{ role: "user", content: "" }], max_tokens: 1024 });
       });
 
     return () => {

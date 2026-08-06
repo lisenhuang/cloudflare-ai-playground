@@ -245,6 +245,17 @@ function renderJsonPayload(payload: unknown) {
 
   const record = (result ?? {}) as Record<string, unknown>;
 
+  // Anthropic messages format: content is an array of typed blocks. Third-party
+  // models reply in their provider's native shape, not Cloudflare's.
+  if (Array.isArray(record.content)) {
+    const text = record.content
+      .filter((block) => (block as Record<string, unknown>)?.type === "text")
+      .map((block) => String((block as Record<string, unknown>).text ?? ""))
+      .join("\n")
+      .trim();
+    if (text) return <TextOutput text={text} />;
+  }
+
   // Text generation, both native and OpenAI-compatible shapes.
   const choices = record.choices;
   if (Array.isArray(choices) && choices.length) {

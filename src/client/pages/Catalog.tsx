@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ApiError, Model } from "../../shared/types";
 import {
   buildFacets,
@@ -10,6 +10,7 @@ import {
 import { FilterMenu } from "../components/FilterMenu";
 import { ModelCard } from "../components/ModelCard";
 import { describeAge } from "../state/catalogCache";
+import { navigate } from "../state/useCatalog";
 import { saveCatalogScroll, takeCatalogScroll } from "../state/useFilters";
 
 const SORT_LABELS: Record<SortOrder, string> = {
@@ -181,12 +182,27 @@ export function Catalog({
       */}
       {!loading && models.length > 0 && thirdPartyCount === 0 && (
         <div className="billing-notice" role="status">
-          <strong>Only Cloudflare-hosted models are available on this account.</strong>
+          <strong>Third-party models are runnable, but Cloudflare does not list them.</strong>
           <p>
-            Third-party models — Anthropic, Google, OpenAI, ElevenLabs, Black Forest Labs — are gated
-            behind <strong>Unified Billing</strong>. Until your AI Gateway has credits (or a provider
-            key via BYOK), Cloudflare does not list them, and running one returns{" "}
-            <code>402 Insufficient balance</code>. This is an account state, not a token permission.
+            The catalog API only ever returns Workers AI models, so Anthropic, Google, OpenAI and the
+            rest cannot appear in this grid — that is an API limitation, not a missing permission or
+            an empty account. They <em>do</em> run through the same endpoint: open one by ID below.
+            Running one needs credits in your AI Gateway (or a provider key via BYOK); without them
+            it returns <code>402 Insufficient balance</code>.
+          </p>
+          <ModelIdEntry />
+          <p className="muted small">
+            Browse IDs in{" "}
+            <a
+              href="https://developers.cloudflare.com/ai/models/?providers=third-party"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Cloudflare's third-party list ↗
+            </a>{" "}
+            — for example <code>anthropic/claude-opus-5</code> or{" "}
+            <code>google/gemini-3.6-flash</code>. These models publish no input schema, so the runner
+            opens its JSON editor with a chat-shaped starting template.
           </p>
           <details className="billing-steps">
             <summary>How to add credits</summary>
@@ -373,6 +389,40 @@ export function Catalog({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Escape hatch for models Cloudflare will run but will not list.
+ *
+ * The runner only needs an id, so any valid model identifier works here —
+ * including every third-party model, none of which appear in the catalog API.
+ */
+function ModelIdEntry() {
+  const [value, setValue] = useState("");
+  const trimmed = value.trim();
+
+  return (
+    <form
+      className="model-id-entry"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (trimmed) navigate(`/m/${encodeURIComponent(trimmed)}`);
+      }}
+    >
+      <input
+        className="field-input mono"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="anthropic/claude-opus-5"
+        aria-label="Model ID"
+        spellCheck={false}
+        autoComplete="off"
+      />
+      <button type="submit" className="primary-button small" disabled={!trimmed}>
+        Open model
+      </button>
+    </form>
   );
 }
 

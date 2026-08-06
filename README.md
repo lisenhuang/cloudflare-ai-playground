@@ -79,6 +79,30 @@ Token prices are normalized to USD per million tokens so the catalog can be sort
 image, audio and video models keep their native unit, because a per-token conversion would be
 meaningless for them.
 
+## Third-party models
+
+Cloudflare's catalog API (`/ai/models/search`) returns **only Workers AI models** — 61 on a typical
+account, or 76 including deprecated ones. Third-party models (Anthropic, Google, OpenAI, ElevenLabs,
+Black Forest Labs …) are **never listed by it**, under any parameter: `search=claude`,
+`author=anthropic` and `task=Text-to-Video` all return zero. The `total_count: 286` the endpoint
+reports is not the number it will actually give you.
+
+They do, however, **run** through the same `/ai/run` endpoint, so the app reaches them by ID instead
+of by listing:
+
+1. Put credits in your [AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway)
+   (**Credits Available → Manage → Top-up**), or store a provider key on the gateway for BYOK.
+   Without either, running one returns `402 Insufficient balance`.
+2. Use **Open model by ID** on the catalog page — e.g. `anthropic/claude-opus-5`. IDs are listed in
+   [Cloudflare's third-party catalog](https://developers.cloudflare.com/ai/models/?providers=third-party).
+
+These models publish no input schema (`/ai/models/schema` returns 404), so the runner opens its JSON
+editor seeded with a chat-shaped template. They reply in their provider's native format — the output
+renderer handles Anthropic content blocks and OpenAI `choices` alongside Cloudflare's own shape.
+
+Note that Cloudflare adds a **5% fee** on credits bought through Unified Billing ($100 of credit
+costs $105); inference rates themselves pass through without markup.
+
 ## Caching
 
 The catalog is read live from Cloudflare and **never** hardcoded — but it is cached so the app
