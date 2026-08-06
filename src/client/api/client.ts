@@ -70,6 +70,8 @@ export interface CatalogQuery {
   perPage?: number;
   hideExperimental?: boolean;
   format?: "openrouter";
+  /** Provider filter ("Source Id"); used to sweep every provider. */
+  source?: number;
 }
 
 function toQueryString(query: CatalogQuery): string {
@@ -81,6 +83,7 @@ function toQueryString(query: CatalogQuery): string {
   if (query.perPage) params.set("per_page", String(query.perPage));
   if (query.hideExperimental) params.set("hide_experimental", "true");
   if (query.format) params.set("format", query.format);
+  if (query.source !== undefined) params.set("source", String(query.source));
   return params.toString();
 }
 

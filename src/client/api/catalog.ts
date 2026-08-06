@@ -41,14 +41,44 @@ async function fetchAllPages(creds: Credentials, base: CatalogQuery): Promise<un
   return collected;
 }
 
-/** A pass over the catalog. A failing pass is skipped, never fatal. */
-async function tryPass(creds: Credentials, base: CatalogQuery): Promise<unknown[]> {
+/** What one pass over the catalog produced — including why it produced nothing. */
+export interface LoadPass {
+  label: string;
+  items: number;
+  error?: string;
+}
+
+export interface CatalogLoad {
+  models: Model[];
+  /** Per-pass accounting, so a gap in coverage is visible instead of silent. */
+  passes: LoadPass[];
+}
+
+async function runPass(
+  creds: Credentials,
+  label: string,
+  base: CatalogQuery,
+  passes: LoadPass[],
+): Promise<unknown[]> {
   try {
-    return await fetchAllPages(creds, base);
-  } catch {
+    const items = await fetchAllPages(creds, base);
+    passes.push({ label, items: items.length });
+    return items;
+  } catch (err) {
+    // Recorded rather than swallowed: a silently empty pass is exactly how the
+    // third-party models went missing without anything looking wrong.
+    passes.push({ label, items: 0, error: (err as Error).message });
     return [];
   }
 }
+
+/**
+ * `source` filters the catalog by provider ("Source Id"). The default response
+ * does not necessarily span every provider, so each id is queried explicitly
+ * and the results unioned. Ids are probed rather than assumed to mean anything
+ * in particular — an id that does not exist simply returns nothing.
+ */
+const SOURCE_IDS = [1, 2, 3, 4, 5];
 
 /**
  * Loads the entire catalog once, then filters and sorts in memory.
@@ -62,18 +92,22 @@ async function tryPass(creds: Credentials, base: CatalogQuery): Promise<unknown[
  * instant and correct; server-side pagination cannot rank on a field it does
  * not sort by.
  */
-export async function loadAllModels(creds: Credentials): Promise<Model[]> {
-  const [defaultItems, marketplaceItems] = await Promise.all([
-    fetchAllPages(creds, {}),
-    tryPass(creds, { format: "openrouter" }),
+export async function loadAllModels(creds: Credentials): Promise<CatalogLoad> {
+  const passes: LoadPass[] = [];
+
+  const [defaultItems, marketplaceItems, ...sourceResults] = await Promise.all([
+    runPass(creds, "default", {}, passes),
+    runPass(creds, "marketplace", { format: "openrouter" }, passes),
+    ...SOURCE_IDS.map((source) => runPass(creds, `source=${source}`, { source }, passes)),
   ]);
 
   const priceIndex = buildPriceIndexFromItems(marketplaceItems);
 
-  // Marketplace entries first, then default-format entries overwrite them —
-  // last write wins, and the default format has the better metadata.
+  // Marketplace and per-source entries first, then default-format entries
+  // overwrite them — last write wins, and the default format carries the
+  // richest metadata (task object, description, capabilities).
   const byId = new Map<string, unknown>();
-  for (const item of [...marketplaceItems, ...defaultItems]) {
+  for (const item of [...marketplaceItems, ...sourceResults.flat(), ...defaultItems]) {
     const id = extractId(item);
     if (id) byId.set(id, item);
   }
@@ -83,7 +117,7 @@ export async function loadAllModels(creds: Credentials): Promise<Model[]> {
     const model = normalizeModel(item, priceIndex);
     if (model) models.push(model);
   }
-  return models;
+  return { models, passes };
 }
 
 export type SortOrder = "name" | "price-asc" | "price-desc" | "task";

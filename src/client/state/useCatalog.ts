@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiError, Credentials, Model } from "../../shared/types";
-import { loadAllModels } from "../api/catalog";
+import { loadAllModels, type LoadPass } from "../api/catalog";
 import { RequestFailed } from "../api/client";
 import { readCatalogCache, writeCatalogCache } from "./catalogCache";
 
@@ -13,6 +13,8 @@ interface CatalogState {
   error: ApiError | null;
   /** When the visible data was fetched from Cloudflare. */
   fetchedAt: number | null;
+  /** Per-pass accounting from the last load, for the coverage indicator. */
+  passes: LoadPass[];
   reload: () => void;
 }
 
@@ -28,6 +30,7 @@ export function useCatalog(creds: Credentials | null): CatalogState {
   const [loading, setLoading] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [passes, setPasses] = useState<LoadPass[]>([]);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [nonce, setNonce] = useState(0);
   const forced = useRef(false);
@@ -61,9 +64,10 @@ export function useCatalog(creds: Credentials | null): CatalogState {
     }
 
     loadAllModels(creds)
-      .then((loaded) => {
+      .then(({ models: loaded, passes: loadPasses }) => {
         if (cancelled) return;
         setModels(loaded);
+        setPasses(loadPasses);
         setFetchedAt(Date.now());
         setError(null);
         writeCatalogCache(creds.accountId, loaded);
@@ -95,7 +99,7 @@ export function useCatalog(creds: Credentials | null): CatalogState {
     };
   }, [creds, nonce]);
 
-  return { models, loading, revalidating, error, fetchedAt, reload };
+  return { models, loading, revalidating, error, fetchedAt, passes, reload };
 }
 
 /** Minimal hash router — enough for three routes and real deep links. */
