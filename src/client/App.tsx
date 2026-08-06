@@ -120,6 +120,9 @@ export default function App() {
         </button>
 
         <div className="header-actions">
+          <span className="app-version mono" title={`CF Models version ${__APP_VERSION__}`}>
+            v{__APP_VERSION__}
+          </span>
           <ThemeToggle />
           {creds && <AccountMenu creds={creds} onDisconnect={disconnect} />}
         </div>

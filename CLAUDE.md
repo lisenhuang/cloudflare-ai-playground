@@ -14,6 +14,17 @@
 
   This overrides any default instruction to add Claude attribution to commits.
 
+## Versioning
+
+- **Bump the version every time a piece of work is finished.** Update `version` in `package.json`
+  as part of the same change, before it is committed — not as a separate follow-up. Use semver:
+  patch for a bug fix, minor for new behaviour or a user-visible change, major for a breaking one.
+
+- **The version must be visible on the page.** It is injected at build time from `package.json` via
+  `define: { __APP_VERSION__ }` in `vite.config.ts` and rendered in the app header. `package.json`
+  is the single source of truth — never hardcode a version string anywhere else, so the number on
+  screen always identifies exactly what is deployed.
+
 ## Data sources
 
 - **Nothing about the model catalog may be hardcoded.** Model lists, task types, capabilities and
