@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiError, Credentials, JsonSchema, Model, ModelSchema } from "../../shared/types";
+import {
+  CF_MODEL_CATALOG_URL,
+  type ApiError,
+  type Credentials,
+  type JsonSchema,
+  type Model,
+  type ModelSchema,
+} from "../../shared/types";
 import { RequestFailed, fetchModelSchema, pollQueuedJob, runModel } from "../api/client";
 import { SchemaForm } from "../form/SchemaForm";
 import { getVariants, initialValues, missingRequired, pruneValues } from "../form/schema";
@@ -337,6 +344,26 @@ export function ModelRunner({ creds, model }: { creds: Credentials; model: Model
 
         {model.description && <p className="runner-description">{model.description}</p>}
 
+        {/*
+          The exact fields Cloudflare returns per model are not documented, and
+          guessing at them has already caused two wrong diagnoses. This shows
+          the untouched catalog record so classification questions can be
+          answered by looking rather than inferring.
+        */}
+        <details className="raw-record">
+          <summary>Raw catalog record from Cloudflare</summary>
+          {model.raw ? (
+            <pre className="code-block json-block">
+              <code>{JSON.stringify(model.raw, null, 2)}</code>
+            </pre>
+          ) : (
+            <p className="muted small">
+              This model came from the local cache, which does not keep the raw payload. Hit Refresh
+              on the catalog to fetch it again.
+            </p>
+          )}
+        </details>
+
         <div className="price-panel">
           <h2>Pricing</h2>
           {billable.length ? (
@@ -360,7 +387,11 @@ export function ModelRunner({ creds, model }: { creds: Credentials; model: Model
           ) : (
             <p className="muted">
               Cloudflare does not publish a price for this model through the API. Nothing is estimated
-              here — check the model's page in the dashboard.
+              here — check{" "}
+              <a href={CF_MODEL_CATALOG_URL} target="_blank" rel="noreferrer">
+                Cloudflare's model catalog ↗
+              </a>
+              .
             </p>
           )}
         </div>

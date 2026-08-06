@@ -1,5 +1,8 @@
 /** Types shared between the Worker proxy and the React client. */
 
+/** Cloudflare's own model catalog docs — the reference for every model listed here. */
+export const CF_MODEL_CATALOG_URL = "https://developers.cloudflare.com/ai/models/";
+
 /** Credentials the visitor supplies from the browser. Never stored server-side. */
 export interface Credentials {
   accountId: string;

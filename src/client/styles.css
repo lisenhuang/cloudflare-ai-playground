@@ -270,6 +270,40 @@ a:hover {
   gap: 6px;
 }
 
+.doc-link {
+  font-size: 13px;
+  font-weight: 520;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.doc-link:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+/* The full label on wide screens, an abbreviation once the header tightens. */
+.doc-link-short {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .doc-link {
+    padding: 6px 8px;
+  }
+
+  .doc-link-full {
+    display: none;
+  }
+
+  .doc-link-short {
+    display: inline;
+  }
+}
+
 .app-version {
   font-size: 11.5px;
   color: var(--text-faint);
@@ -1252,6 +1286,29 @@ select.field-input {
   font-size: 14px;
   color: var(--text-muted);
   max-width: 78ch;
+}
+
+.raw-record {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 14px;
+}
+
+.raw-record summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+
+.raw-record summary:hover {
+  color: var(--text);
+}
+
+.raw-record .code-block {
+  margin-top: 10px;
+  max-height: 340px;
 }
 
 .price-panel {

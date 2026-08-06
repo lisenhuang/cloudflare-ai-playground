@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Credentials, Model } from "../shared/types";
+import { CF_MODEL_CATALOG_URL, type Credentials, type Model } from "../shared/types";
 import { Catalog } from "./pages/Catalog";
 import { ModelRunner } from "./pages/ModelRunner";
 import { Setup } from "./pages/Setup";
@@ -120,6 +120,16 @@ export default function App() {
         </button>
 
         <div className="header-actions">
+          <a
+            className="doc-link"
+            href={CF_MODEL_CATALOG_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="Cloudflare's model catalog documentation"
+          >
+            <span className="doc-link-full">Model catalog</span>
+            <span className="doc-link-short">Docs</span> <span aria-hidden="true">↗</span>
+          </a>
           <span className="app-version mono" title={`CF Models version ${__APP_VERSION__}`}>
             v{__APP_VERSION__}
           </span>
