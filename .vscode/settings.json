@@ -1,0 +1,48 @@
+{
+  // Checked into the repo on purpose — these prompts should apply to everyone
+  // working on this project, not just whoever configured them locally.
+  // Do not add .vscode/ to .gitignore.
+
+  // Drives the ✨ "Generate Commit Message" button in the Source Control panel.
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Write a comprehensive, detailed commit message. Use the Conventional Commits format for the subject line: `type(scope): summary`, where type is one of feat, fix, refactor, perf, docs, test, build, ci, chore. Keep the subject in the imperative mood ('add', not 'added'/'adds'), lowercase after the colon, no trailing period, and at most 72 characters."
+    },
+    {
+      "text": "Always include a body, separated from the subject by a blank line and wrapped at 72 characters. The body must explain WHY the change was made and what problem it solves — not merely restate the diff. If the change fixes a bug, describe the incorrect behaviour, its user-visible symptom, and the root cause. If it changes behaviour, state the old behaviour and the new one."
+    },
+    {
+      "text": "When a commit touches several distinct areas, group the body into short bullet points ('- ' prefix), one per area, each naming the affected file or module. Prefer a handful of meaningful bullets over an exhaustive per-file list."
+    },
+    {
+      "text": "Call out anything a reviewer or future maintainer could not infer from the diff alone: breaking changes (as a `BREAKING CHANGE:` footer), new environment variables or secrets, required migrations, new dependencies, and follow-up work that was deliberately left out of scope."
+    },
+    {
+      "text": "Be precise and factual. Describe only what the diff actually does — never speculate, never claim tests were run or that something was verified unless the diff shows it. Do not pad with filler like 'various improvements' or 'minor changes'."
+    },
+    {
+      "text": "Never add AI attribution of any kind: no 'Co-Authored-By: Copilot/Claude/AI' trailers, no 'Generated with' footers, no mention of an assistant. The commit must read as though the human author wrote it."
+    },
+    {
+      "text": "Project context: a bring-your-own-key Cloudflare AI playground (Cloudflare Workers + Hono + React). The model catalog, task types and pricing are always read live from the Cloudflare API and never hardcoded. If a change touches catalog loading, pagination, caching or price resolution, say explicitly in the body how it preserves that guarantee."
+    }
+  ],
+
+  // Applies to the ✨ PR title/description generation, for consistency.
+  "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+    {
+      "text": "Write a clear PR title in Conventional Commits format, then a description with a '## Summary' section explaining the motivation and approach, and a '## Testing' section listing only the verification that was actually performed. Never add AI attribution."
+    }
+  ],
+
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "files.eol": "\n",
+  "[json][jsonc][typescript][typescriptreact][css][markdown]": {
+    "editor.tabSize": 2
+  }
+}

@@ -8,7 +8,8 @@ Built on Cloudflare Workers + Hono + React. Bring your own key.
 ## What it does
 
 - **Browses the whole catalog** from `GET /ai/models/search`, with search, task-type and author
-  facets, and Cloudflare-vs-third-party filtering.
+  facets, and Cloudflare-vs-third-party filtering. Every page of results is walked, and both catalog
+  formats are unioned, so no task type goes missing. Filters survive opening a model and coming back.
 - **Prices every model from the API.** No price is hardcoded anywhere in this repo — see
   [Pricing](#pricing) below.
 - **Generates a form per model** from `GET /ai/models/schema`, so a model added to Cloudflare
@@ -78,6 +79,21 @@ Token prices are normalized to USD per million tokens so the catalog can be sort
 image, audio and video models keep their native unit, because a per-token conversion would be
 meaningless for them.
 
+## Caching
+
+The catalog is read live from Cloudflare and **never** hardcoded — but it is cached so the app
+paints instantly. `src/client/state/catalogCache.ts` implements stale-while-revalidate:
+
+- The cache is scoped per account ID, expires after 24 hours, and carries a version number so a
+  loader fix invalidates entries produced by the old one.
+- A warm cache renders immediately, then a background refresh replaces it. The header shows how old
+  the data is, and **Refresh** forces a re-fetch.
+- If a background refresh fails, the cached list stays on screen with an explicit warning rather
+  than blanking out.
+- Disconnecting clears the cached catalog along with the token.
+
+Per-model input schemas are cached separately in `sessionStorage`, keyed by model ID.
+
 ## Pinning the API shapes
 
 Parts of the catalog response are not fully specified in Cloudflare's public docs. The probe script
@@ -117,3 +133,10 @@ scripts/probe.mjs     API shape probe
   minutes. A pending job is stored in `localStorage`, so a page refresh resumes polling.
 - The whole catalog is loaded once and filtered in memory. That is what makes sorting by price
   correct — the API cannot rank on a field it does not sort by.
+- Pagination does **not** assume the API honours the requested `per_page`. Cloudflare caps it at its
+  own maximum, and treating a short page as the end of the list silently truncated the catalog to a
+  single page — which is how the video and music models went missing. The loader now walks pages
+  until the server reports completion.
+- Project conventions, including the git rules for AI assistants, live in [CLAUDE.md](CLAUDE.md).
+  Shared editor settings — including the commit-message generation prompts — are checked in under
+  [.vscode/settings.json](.vscode/settings.json) on purpose.
