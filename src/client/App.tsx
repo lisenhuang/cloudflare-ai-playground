@@ -3,9 +3,11 @@ import type { Credentials, Model } from "../shared/types";
 import { Catalog } from "./pages/Catalog";
 import { ModelRunner } from "./pages/ModelRunner";
 import { Setup } from "./pages/Setup";
+import { clearCatalogCache } from "./state/catalogCache";
 import { clearCredentials, loadCredentials, maskToken } from "./state/creds";
 import { useTheme } from "./state/theme";
 import { navigate, useCatalog, useHashRoute } from "./state/useCatalog";
+import { useFilters } from "./state/useFilters";
 
 /**
  * A model deep-linked by id that is not (yet) in the loaded catalog still
@@ -86,7 +88,10 @@ function AccountMenu({ creds, onDisconnect }: { creds: Credentials; onDisconnect
 export default function App() {
   const [creds, setCreds] = useState<Credentials | null>(loadCredentials);
   const route = useHashRoute();
-  const { models, loading, error, reload } = useCatalog(creds);
+  const { models, loading, revalidating, error, fetchedAt, reload } = useCatalog(creds);
+  // Held here rather than inside Catalog, so opening a model and coming back
+  // does not throw away the filters the user set.
+  const { filters, update: updateFilters, reset: resetFilters } = useFilters();
 
   const activeModel = useMemo(() => {
     if (route.name !== "model" || !route.modelId) return null;
@@ -94,6 +99,8 @@ export default function App() {
   }, [route, models]);
 
   const disconnect = () => {
+    // The cached catalog belongs to that account — clear it out with the token.
+    if (creds) clearCatalogCache(creds.accountId);
     clearCredentials();
     setCreds(null);
     navigate("/setup");
@@ -130,7 +137,17 @@ export default function App() {
         ) : route.name === "model" && activeModel && creds ? (
           <ModelRunner creds={creds} model={activeModel} />
         ) : (
-          <Catalog models={models} loading={loading} error={error} onRetry={reload} />
+          <Catalog
+            models={models}
+            loading={loading}
+            revalidating={revalidating}
+            error={error}
+            fetchedAt={fetchedAt}
+            filters={filters}
+            onFiltersChange={updateFilters}
+            onClearFilters={resetFilters}
+            onRetry={reload}
+          />
         )}
       </main>
     </div>

@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { ApiError, Model } from "../../shared/types";
-import { buildFacets, filterModels, type SortOrder } from "../api/catalog";
+import { buildFacets, filterModels, type CatalogFilters, type SortOrder } from "../api/catalog";
 import { FilterMenu } from "../components/FilterMenu";
 import { ModelCard } from "../components/ModelCard";
+import { describeAge } from "../state/catalogCache";
+import { saveCatalogScroll, takeCatalogScroll } from "../state/useFilters";
 
 const SORT_LABELS: Record<SortOrder, string> = {
   name: "Name",
@@ -14,40 +16,58 @@ const SORT_LABELS: Record<SortOrder, string> = {
 export function Catalog({
   models,
   loading,
+  revalidating,
   error,
+  fetchedAt,
+  filters,
+  onFiltersChange,
+  onClearFilters,
   onRetry,
 }: {
   models: Model[];
   loading: boolean;
+  revalidating: boolean;
   error: ApiError | null;
+  fetchedAt: number | null;
+  filters: CatalogFilters;
+  onFiltersChange: (patch: Partial<CatalogFilters>) => void;
+  onClearFilters: () => void;
   onRetry: () => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [tasks, setTasks] = useState<string[]>([]);
-  const [authors, setAuthors] = useState<string[]>([]);
-  const [hostingFilter, setHostingFilter] = useState<"all" | "cloudflare" | "third-party">("all");
-  const [sort, setSort] = useState<SortOrder>("name");
-
   const facets = useMemo(() => buildFacets(models), [models]);
-  const visible = useMemo(
-    () => filterModels(models, { search, tasks, authors, hostingFilter, sort }),
-    [models, search, tasks, authors, hostingFilter, sort],
-  );
+  const visible = useMemo(() => filterModels(models, filters), [models, filters]);
 
   const pricedCount = useMemo(
     () => models.filter((model) => model.pricing.entries.length > 0).length,
     [models],
   );
 
-  const hasFilters = search !== "" || tasks.length > 0 || authors.length > 0 || hostingFilter !== "all";
-  const clearAll = () => {
-    setSearch("");
-    setTasks([]);
-    setAuthors([]);
-    setHostingFilter("all");
-  };
+  const hasFilters =
+    filters.search !== "" ||
+    filters.tasks.length > 0 ||
+    filters.authors.length > 0 ||
+    filters.hostingFilter !== "all";
 
-  if (error) {
+  // Remember where the user was, so returning from a model lands in place.
+  const restored = useRef(false);
+  useLayoutEffect(() => {
+    if (restored.current || visible.length === 0) return;
+    restored.current = true;
+    const offset = takeCatalogScroll();
+    if (offset > 0) window.scrollTo(0, offset);
+  }, [visible.length]);
+
+  useEffect(() => {
+    const remember = () => saveCatalogScroll(window.scrollY);
+    window.addEventListener("scroll", remember, { passive: true });
+    return () => {
+      remember();
+      window.removeEventListener("scroll", remember);
+    };
+  }, []);
+
+  // Only take over the page when there is nothing cached to fall back on.
+  if (error && models.length === 0) {
     return (
       <div className="page">
         <div className="output-error" role="alert">
@@ -78,28 +98,43 @@ export function Catalog({
           <input
             className="search-input"
             placeholder="Search models…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ search: event.target.value })}
             aria-label="Search models"
           />
-          {search && (
-            <button type="button" className="search-clear" onClick={() => setSearch("")} aria-label="Clear search">
+          {filters.search && (
+            <button
+              type="button"
+              className="search-clear"
+              onClick={() => onFiltersChange({ search: "" })}
+              aria-label="Clear search"
+            >
               ×
             </button>
           )}
         </div>
 
         <div className="filter-row">
-          <FilterMenu label="Task types" options={facets.tasks} selected={tasks} onChange={setTasks} />
-          <FilterMenu label="Authors" options={facets.authors} selected={authors} onChange={setAuthors} />
+          <FilterMenu
+            label="Task types"
+            options={facets.tasks}
+            selected={filters.tasks}
+            onChange={(tasks) => onFiltersChange({ tasks })}
+          />
+          <FilterMenu
+            label="Authors"
+            options={facets.authors}
+            selected={filters.authors}
+            onChange={(authors) => onFiltersChange({ authors })}
+          />
 
           <div className="segmented" role="group" aria-label="Hosting">
             {(["all", "cloudflare", "third-party"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
-                className={hostingFilter === value ? "is-selected" : ""}
-                onClick={() => setHostingFilter(value)}
+                className={filters.hostingFilter === value ? "is-selected" : ""}
+                onClick={() => onFiltersChange({ hostingFilter: value })}
               >
                 {value === "all" ? "All" : value === "cloudflare" ? "Cloudflare" : "Third-party"}
               </button>
@@ -110,8 +145,8 @@ export function Catalog({
             <span className="sr-only">Sort by</span>
             <select
               className="field-input sort-select"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortOrder)}
+              value={filters.sort}
+              onChange={(event) => onFiltersChange({ sort: event.target.value as SortOrder })}
             >
               {(Object.keys(SORT_LABELS) as SortOrder[]).map((value) => (
                 <option key={value} value={value}>
@@ -123,10 +158,17 @@ export function Catalog({
         </div>
       </div>
 
+      {error && models.length > 0 && (
+        <div className="notice" role="status">
+          <strong>Could not refresh from Cloudflare.</strong> {error.message}{" "}
+          {error.hint && <span className="muted">{error.hint}</span>}
+        </div>
+      )}
+
       <div className="result-line">
         {loading ? (
           <span className="loading-line">
-            <span className="spinner small" aria-hidden="true" /> Loading catalog…
+            <span className="spinner small" aria-hidden="true" /> Loading catalog from Cloudflare…
           </span>
         ) : (
           <>
@@ -136,11 +178,31 @@ export function Catalog({
                 <span className="muted"> · {models.length - pricedCount} without published pricing</span>
               )}
             </span>
-            {hasFilters && (
-              <button type="button" className="link-button" onClick={clearAll}>
-                Clear filters
+            <span className="result-actions">
+              {hasFilters && (
+                <button type="button" className="link-button" onClick={onClearFilters}>
+                  Clear filters
+                </button>
+              )}
+              <span className="freshness muted">
+                {revalidating ? (
+                  <>
+                    <span className="spinner small" aria-hidden="true" /> refreshing…
+                  </>
+                ) : (
+                  fetchedAt !== null && `updated ${describeAge(fetchedAt)}`
+                )}
+              </span>
+              <button
+                type="button"
+                className="ghost-button small"
+                onClick={onRetry}
+                disabled={revalidating}
+                title="Re-fetch the model list from Cloudflare"
+              >
+                Refresh
               </button>
-            )}
+            </span>
           </>
         )}
       </div>
@@ -155,7 +217,7 @@ export function Catalog({
         <div className="output-empty">
           <p>No models match those filters.</p>
           {hasFilters && (
-            <button type="button" className="secondary-button" onClick={clearAll}>
+            <button type="button" className="secondary-button" onClick={onClearFilters}>
               Clear filters
             </button>
           )}

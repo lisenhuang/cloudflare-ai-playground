@@ -1010,6 +1010,21 @@ select.field-input {
   gap: 9px;
 }
 
+.result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
 .model-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
